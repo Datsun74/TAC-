@@ -1,9 +1,11 @@
 import { EmptyState } from "@/components/empty-state";
+import { FamilyAppShell } from "@/components/family-app-shell";
 import { PageIntro } from "@/components/page-intro";
 
-export default function PurchasedPage() {
+export default async function PurchasedPage() {
   return (
-    <section className="w-full py-10 sm:py-14 lg:py-16">
+    <FamilyAppShell>
+      <section className="w-full py-10 sm:py-14 lg:py-16">
       <PageIntro
         description="У цьому розділі згодом можна буде переглянути те, що вже придбано."
         eyebrow="Історія"
@@ -18,6 +20,7 @@ export default function PurchasedPage() {
           title="Ще немає куплених позицій"
         />
       </div>
-    </section>
+      </section>
+    </FamilyAppShell>
   );
 }

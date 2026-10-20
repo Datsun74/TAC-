@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { FamilyAppShell } from "@/components/family-app-shell";
 import { PageIntro } from "@/components/page-intro";
 
 const demoItems = [
@@ -8,9 +9,10 @@ const demoItems = [
   { title: "Яблука", type: "Покупка", details: "1 кг", note: "Солодкі, якщо будуть" },
 ];
 
-export default function PurchasesPage() {
+export default async function PurchasesPage() {
   return (
-    <section className="w-full py-10 sm:py-14 lg:py-16">
+    <FamilyAppShell>
+      <section className="w-full py-10 sm:py-14 lg:py-16">
       <PageIntro
         description="Поки що це лише приклади того, як виглядатиме спільний список. Дані не зберігаються."
         eyebrow="Спільний список"
@@ -52,6 +54,7 @@ export default function PurchasesPage() {
           </li>
         ))}
       </ul>
-    </section>
+      </section>
+    </FamilyAppShell>
   );
 }

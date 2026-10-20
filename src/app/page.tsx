@@ -1,8 +1,11 @@
 import Link from "next/link";
 
-export default function Home() {
+import { FamilyAppShell } from "@/components/family-app-shell";
+
+export default async function Home() {
   return (
-    <section className="flex flex-1 items-center py-10 sm:py-16 lg:py-20">
+    <FamilyAppShell>
+      <section className="flex flex-1 items-center py-10 sm:py-16 lg:py-20">
       <div className="grid w-full gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-end lg:gap-16">
         <div className="max-w-3xl">
           <p className="mb-5 text-sm font-semibold tracking-[0.16em] text-amber-800 uppercase">
@@ -48,6 +51,7 @@ export default function Home() {
           </p>
         </aside>
       </div>
-    </section>
+      </section>
+    </FamilyAppShell>
   );
 }

@@ -1,9 +1,11 @@
 import { EmptyState } from "@/components/empty-state";
+import { FamilyAppShell } from "@/components/family-app-shell";
 import { PageIntro } from "@/components/page-intro";
 
-export default function ShoppingPage() {
+export default async function ShoppingPage() {
   return (
-    <section className="w-full py-10 sm:py-14 lg:py-16">
+    <FamilyAppShell>
+      <section className="w-full py-10 sm:py-14 lg:py-16">
       <PageIntro
         description="Тут з’являтиметься короткий список речей для поточного походу в магазин."
         eyebrow="Режим походу"
@@ -18,6 +20,7 @@ export default function ShoppingPage() {
           title="Список для магазину буде тут"
         />
       </div>
-    </section>
+      </section>
+    </FamilyAppShell>
   );
 }
