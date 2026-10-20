@@ -12,13 +12,13 @@ export default async function Home() {
             Для всієї родини
           </p>
           <h1 className="max-w-2xl text-4xl leading-tight font-semibold tracking-tight text-stone-950 sm:text-5xl lg:text-6xl">
-            Лист сімейних побажань
+            Сімейні покупки
           </h1>
           <p className="mt-6 text-lg leading-8 text-stone-700 sm:text-xl">
-            Сімейний список покупок і побажань
+            Спільний список покупок для всієї родини
           </p>
           <p className="mt-3 text-base leading-7 text-stone-600">
-            Додавайте важливе, тримайте список поруч і збирайтеся до магазину без зайвих повідомлень у чатах.
+            Додавайте потрібне, тримайте список поруч і збирайтеся до магазину без зайвих повідомлень у чатах.
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Link
@@ -47,7 +47,7 @@ export default async function Home() {
             Невеликий простір для важливих речей, які хочеться пам’ятати разом.
           </p>
           <p className="mt-4 rounded-2xl bg-white/80 p-4 text-sm leading-6 text-stone-600">
-            Зараз доступний лише каркас інтерфейсу. Дані ще не зберігаються — це з’явиться в наступних етапах.
+            Додавайте покупки до спільного списку. Режим походу в магазин і позначка «Куплено» з’являться на наступному етапі.
           </p>
         </aside>
       </div>

@@ -1,8 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { MagicLinkForm } from "@/components/magic-link-form";
+import { isLocalTestMode } from "@/lib/test-mode";
 
 export default function LoginPage() {
+  if (isLocalTestMode()) {
+    redirect("/");
+  }
+
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center px-4 py-10 sm:px-6">
       <section className="w-full rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-9">

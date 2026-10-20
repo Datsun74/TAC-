@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getSupabasePublicConfig } from "@/lib/supabase";
+import { isLocalTestMode } from "@/lib/test-mode";
 
 const protectedRoutes = new Set(["/", "/purchases", "/add", "/shopping", "/purchased"]);
 
@@ -20,6 +21,10 @@ function copySessionCookies(source: NextResponse, target: NextResponse) {
 }
 
 export async function updateSession(request: NextRequest) {
+  if (isLocalTestMode()) {
+    return NextResponse.next({ request });
+  }
+
   const { supabaseUrl, supabaseAnonKey } = getSupabasePublicConfig();
   let supabaseResponse = NextResponse.next({ request });
 

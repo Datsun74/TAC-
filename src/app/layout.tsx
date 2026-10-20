@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Лист сімейних побажань",
-  description: "Сімейний список покупок і побажань.",
+  title: "Сімейні покупки",
+  description: "Спільний сімейний список покупок.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

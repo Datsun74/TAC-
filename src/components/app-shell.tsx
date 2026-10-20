@@ -10,9 +10,10 @@ import { createClient } from "@/lib/supabase/client";
 type AppShellProps = Readonly<{
   children: React.ReactNode;
   memberName: string;
+  testMode?: boolean;
 }>;
 
-export function AppShell({ children, memberName }: AppShellProps) {
+export function AppShell({ children, memberName, testMode = false }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -42,8 +43,8 @@ export function AppShell({ children, memberName }: AppShellProps) {
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 sm:px-6 lg:px-8">
       <header className="flex items-center justify-between border-b border-stone-200 py-4 sm:py-5">
         <Link className="text-sm font-semibold tracking-tight text-stone-950 sm:text-base" href="/">
-          Лист <span className="hidden sm:inline">сімейних побажань</span>
-          <span className="sm:hidden">бажань</span>
+          Сімейні <span className="hidden sm:inline">покупки</span>
+          <span className="sm:hidden">покупки</span>
         </Link>
         <div className="flex items-center gap-2 sm:gap-4">
           <nav aria-label="Основна навігація" className="hidden md:block">
@@ -74,17 +75,26 @@ export function AppShell({ children, memberName }: AppShellProps) {
               <span className="sr-only">Ви увійшли як </span>
               {memberName}
             </span>
-            <button
-              className="min-h-9 rounded-full px-2 text-xs font-semibold text-stone-600 transition-colors hover:bg-white hover:text-stone-950 focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
-              disabled={isSigningOut}
-              onClick={handleSignOut}
-              type="button"
-            >
-              {isSigningOut ? "Вихід…" : "Вийти"}
-            </button>
+            {testMode ? (
+              <span className="px-2 text-xs font-semibold text-amber-800">Тест</span>
+            ) : (
+              <button
+                className="min-h-9 rounded-full px-2 text-xs font-semibold text-stone-600 transition-colors hover:bg-white hover:text-stone-950 focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
+                disabled={isSigningOut}
+                onClick={handleSignOut}
+                type="button"
+              >
+                {isSigningOut ? "Вихід…" : "Вийти"}
+              </button>
+            )}
           </div>
         </div>
       </header>
+      {testMode ? (
+        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-950">
+          Тестовий режим: вхід вимкнено лише на цьому комп’ютері. Нові заявки зберігаються у цьому браузері, а не в Supabase.
+        </p>
+      ) : null}
       {signOutError ? (
         <p aria-live="polite" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">
           {signOutError}

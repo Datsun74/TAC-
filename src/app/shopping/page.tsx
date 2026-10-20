@@ -7,7 +7,7 @@ export default async function ShoppingPage() {
     <FamilyAppShell>
       <section className="w-full py-10 sm:py-14 lg:py-16">
       <PageIntro
-        description="Тут з’являтиметься короткий список речей для поточного походу в магазин."
+        description="Тут з’явиться короткий список активних покупок для поточного походу в магазин."
         eyebrow="Режим походу"
         title="Я йду в магазин"
       />
@@ -15,7 +15,7 @@ export default async function ShoppingPage() {
         <EmptyState
           actionHref="/purchases"
           actionLabel="Переглянути покупки"
-          description="Поки що тут немає записів. Режим походу в магазин з’явиться після підключення справжнього списку."
+          description="Режим походу в магазин з позначками «Куплено» буде додано на наступному етапі."
           icon="◌"
           title="Список для магазину буде тут"
         />

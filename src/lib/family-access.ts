@@ -3,6 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { isLocalTestMode } from "@/lib/test-mode";
 
 export type FamilyMember = Readonly<{
   id: string;
@@ -25,6 +26,13 @@ export async function getAuthenticatedUserId() {
 }
 
 export async function requireFamilyMember(): Promise<FamilyMember> {
+  if (isLocalTestMode()) {
+    return {
+      id: "local-test-member",
+      displayName: "Сергій (тест)",
+    };
+  }
+
   const userId = await getAuthenticatedUserId();
 
   if (!userId) {
