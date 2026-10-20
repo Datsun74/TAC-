@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <section className="flex flex-1 items-center py-10 sm:py-16 lg:py-20">
@@ -13,14 +15,22 @@ export default function Home() {
             Сімейний список покупок і побажань
           </p>
           <p className="mt-3 text-base leading-7 text-stone-600">
-            Застосунок готовий до налаштування.
+            Додавайте важливе, тримайте список поруч і збирайтеся до магазину без зайвих повідомлень у чатах.
           </p>
-          <button
-            className="mt-9 inline-flex items-center rounded-full bg-amber-800 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-amber-900 focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none"
-            type="button"
-          >
-            Почати
-          </button>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <Link
+              className="inline-flex items-center justify-center rounded-full bg-amber-800 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-amber-900 focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none"
+              href="/purchases"
+            >
+              Переглянути покупки
+            </Link>
+            <Link
+              className="inline-flex items-center justify-center rounded-full border border-stone-300 px-6 py-3 text-base font-semibold text-stone-800 transition-colors hover:border-stone-400 hover:bg-white focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none"
+              href="/add"
+            >
+              Додати запис
+            </Link>
+          </div>
         </div>
 
         <aside className="rounded-3xl border border-amber-100 bg-amber-50 p-6 sm:p-8">
@@ -32,6 +42,9 @@ export default function Home() {
           </div>
           <p className="mt-5 text-sm leading-6 text-stone-600">
             Невеликий простір для важливих речей, які хочеться пам’ятати разом.
+          </p>
+          <p className="mt-4 rounded-2xl bg-white/80 p-4 text-sm leading-6 text-stone-600">
+            Зараз доступний лише каркас інтерфейсу. Дані ще не зберігаються — це з’явиться в наступних етапах.
           </p>
         </aside>
       </div>
