@@ -1,35 +1,21 @@
 import "server-only";
 
 import { requireFamilyMember } from "@/lib/family-access";
-import { type ShoppingCategory } from "@/lib/shopping-categories";
+import type { ShoppingCategory } from "@/lib/shopping-categories";
+import type { ShoppingItemsResult, ShoppingItemStatus } from "@/lib/shopping-item-types";
 import { createClient } from "@/lib/supabase/server";
 
-export type ShoppingItem = Readonly<{
-  id: string;
-  title: string;
-  category: ShoppingCategory;
-  storeSection: string;
-  quantity: string;
-  features: string | null;
-  requestedBy: string;
-  createdAt: string;
-}>;
-
-type ShoppingItemsResult =
-  | Readonly<{ items: ShoppingItem[]; error: null }>
-  | Readonly<{ items: []; error: string }>;
-
-export async function getActiveShoppingItems(): Promise<ShoppingItemsResult> {
+async function getShoppingItems(status: ShoppingItemStatus): Promise<ShoppingItemsResult> {
   await requireFamilyMember();
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("shopping_items")
-    .select("id, title, category, store_section, quantity, features, requested_by, created_at")
-    .eq("status", "active")
+    .select("id, title, category, store_section, quantity, features, requested_by, created_at, status, purchased_by, purchased_at")
+    .eq("status", status)
     .order("category")
     .order("store_section")
-    .order("created_at", { ascending: false });
+    .order(status === "purchased" ? "purchased_at" : "created_at", { ascending: false });
 
   if (error) {
     return { items: [], error: "Не вдалося завантажити список. Спробуйте оновити сторінку." };
@@ -46,6 +32,17 @@ export async function getActiveShoppingItems(): Promise<ShoppingItemsResult> {
       features: item.features,
       requestedBy: item.requested_by,
       createdAt: item.created_at,
+      status: item.status as ShoppingItemStatus,
+      purchasedBy: item.purchased_by,
+      purchasedAt: item.purchased_at,
     })),
   };
+}
+
+export function getActiveShoppingItems() {
+  return getShoppingItems("active");
+}
+
+export function getPurchasedShoppingItems() {
+  return getShoppingItems("purchased");
 }

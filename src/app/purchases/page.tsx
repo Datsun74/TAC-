@@ -4,8 +4,9 @@ import { EmptyState } from "@/components/empty-state";
 import { FamilyAppShell } from "@/components/family-app-shell";
 import { LocalTestPurchases } from "@/components/local-test-purchases";
 import { PageIntro } from "@/components/page-intro";
-import { getActiveShoppingItems, type ShoppingItem } from "@/lib/shopping-items";
+import { getActiveShoppingItems } from "@/lib/shopping-items";
 import { shoppingCategoryLabels, shoppingCategoryOptions } from "@/lib/shopping-categories";
+import type { ShoppingItem } from "@/lib/shopping-item-types";
 import { isLocalTestMode } from "@/lib/test-mode";
 
 function formatCreatedAt(value: string) {

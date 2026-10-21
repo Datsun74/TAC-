@@ -9,8 +9,9 @@ import {
   shoppingCategoryOptions,
   type ShoppingCategory,
 } from "@/lib/shopping-categories";
+import { readLocalTestShoppingItems, writeLocalTestShoppingItems } from "@/lib/local-test-shopping-items";
+import type { ShoppingItem } from "@/lib/shopping-item-types";
 import { createClient } from "@/lib/supabase/client";
-import { localTestItemsStorageKey } from "@/lib/test-mode";
 
 type FormValues = {
   title: string;
@@ -60,16 +61,6 @@ function validate(values: FormValues): FormErrors {
   return errors;
 }
 
-function getStoredTestItems() {
-  try {
-    const storedItems = JSON.parse(window.localStorage.getItem(localTestItemsStorageKey) ?? "[]") as unknown;
-
-    return Array.isArray(storedItems) ? storedItems : [];
-  } catch {
-    return [];
-  }
-}
-
 type AddItemFormProps = Readonly<{
   requestedBy: string;
   testMode: boolean;
@@ -108,24 +99,21 @@ export function AddItemForm({ requestedBy, testMode }: AddItemFormProps) {
     const storeSection = values.storeSection === "custom" ? values.customStoreSection.trim() : values.storeSection;
 
     if (testMode) {
-      const items = getStoredTestItems();
+      const item: ShoppingItem = {
+        id: window.crypto.randomUUID(),
+        title: values.title.trim(),
+        category: values.category,
+        storeSection,
+        quantity: values.quantity.trim(),
+        features: values.features.trim() || null,
+        requestedBy,
+        createdAt: new Date().toISOString(),
+        status: "active",
+        purchasedBy: null,
+        purchasedAt: null,
+      };
 
-      window.localStorage.setItem(
-        localTestItemsStorageKey,
-        JSON.stringify([
-          ...items,
-          {
-            id: window.crypto.randomUUID(),
-            title: values.title.trim(),
-            category: values.category,
-            storeSection,
-            quantity: values.quantity.trim(),
-            features: values.features.trim() || null,
-            requestedBy,
-            createdAt: new Date().toISOString(),
-          },
-        ]),
-      );
+      writeLocalTestShoppingItems([...readLocalTestShoppingItems(), item]);
 
       setValues(initialValues);
       setSubmissionState("success");
