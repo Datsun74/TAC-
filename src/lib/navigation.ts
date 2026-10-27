@@ -6,4 +6,5 @@ export const navigationItems: NavigationItem[] = [
   { label: "Додати", mobileLabel: "Додати", href: "/add" },
   { label: "Я йду в магазин", mobileLabel: "Магазин", href: "/shopping" },
   { label: "Куплено", mobileLabel: "Куплено", href: "/purchased" },
+  { label: "Відхилені", mobileLabel: "Відхил.", href: "/rejected" },
 ];

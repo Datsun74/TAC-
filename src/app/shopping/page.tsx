@@ -21,7 +21,7 @@ export default async function ShoppingPage() {
         {result?.error ? (
           <section className="mt-8 rounded-3xl border border-red-200 bg-red-50 px-6 py-8 text-center"><h2 className="text-lg font-semibold text-red-950">Список поки недоступний</h2><p className="mt-2 text-sm text-red-800">{result.error}</p></section>
         ) : (
-          <ShoppingTrip initialItems={result?.items ?? []} memberName={member.displayName} testMode={testMode} />
+          <ShoppingTrip familyId={member.familyId} initialItems={result?.items ?? []} memberName={member.displayName} testMode={testMode} />
         )}
       </section>
     </FamilyAppShell>

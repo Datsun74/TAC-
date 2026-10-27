@@ -1,4 +1,4 @@
-export const shoppingCategoryValues = ["groceries", "cosmetics", "building", "other"] as const;
+export const shoppingCategoryValues = ["groceries", "cosmetics", "building", "serhii_personal", "other"] as const;
 
 export type ShoppingCategory = (typeof shoppingCategoryValues)[number];
 
@@ -23,6 +23,11 @@ export const shoppingCategoryOptions: ReadonlyArray<{
     sections: ["Фарби та оздоблення", "Інструменти", "Електрика", "Сантехніка", "Кріплення"],
   },
   {
+    value: "serhii_personal",
+    label: "Сергій особисте",
+    sections: ["Особисте", "Одяг та взуття", "Техніка", "Хобі", "Інше"],
+  },
+  {
     value: "other",
     label: "Інше",
     sections: ["Дім", "Одяг", "Тварини", "Аптека", "Інше"],
@@ -33,6 +38,7 @@ export const shoppingCategoryLabels: Record<ShoppingCategory, string> = {
   groceries: "Продукти",
   cosmetics: "Косметика",
   building: "Будівництво",
+  serhii_personal: "Сергій особисте",
   other: "Інше",
 };
 

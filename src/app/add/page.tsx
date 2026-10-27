@@ -16,7 +16,7 @@ export default async function AddPage() {
           title="Додати до списку"
         />
         <div className="mt-8 max-w-2xl">
-          <AddItemForm requestedBy={member.displayName} testMode={isLocalTestMode()} />
+          <AddItemForm familyId={member.familyId} requestedBy={member.displayName} testMode={isLocalTestMode()} />
         </div>
       </section>
     </FamilyAppShell>

@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type PurchasedHistoryProps = Readonly<{
   initialItems: ShoppingItem[];
+  familyId: string;
   testMode: boolean;
 }>;
 
@@ -34,7 +35,7 @@ function formatPurchaseTime(value: string | null) {
   }).format(new Date(value));
 }
 
-export function PurchasedHistory({ initialItems, testMode }: PurchasedHistoryProps) {
+export function PurchasedHistory({ initialItems, familyId, testMode }: PurchasedHistoryProps) {
   const [items, setItems] = useState<ShoppingItem[] | null>(testMode ? null : initialItems);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -57,15 +58,16 @@ export function PurchasedHistory({ initialItems, testMode }: PurchasedHistoryPro
       if (testMode) {
         const updatedItems = readLocalTestShoppingItems().map((storedItem) =>
           storedItem.id === item.id
-            ? { ...storedItem, status: "active" as const, purchasedBy: null, purchasedAt: null }
+            ? { ...storedItem, status: "active" as const, purchasedBy: null, purchasedAt: null, rejectedBy: null, rejectedAt: null }
             : storedItem,
         );
         writeLocalTestShoppingItems(updatedItems);
       } else {
         const { error } = await createClient()
           .from("shopping_items")
-          .update({ status: "active", purchased_by: null, purchased_at: null })
-          .eq("id", item.id);
+          .update({ status: "active", purchased_by: null, purchased_at: null, rejected_by: null, rejected_at: null })
+          .eq("id", item.id)
+          .eq("family_id", familyId);
 
         if (error) throw error;
       }

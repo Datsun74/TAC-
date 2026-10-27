@@ -63,10 +63,11 @@ function validate(values: FormValues): FormErrors {
 
 type AddItemFormProps = Readonly<{
   requestedBy: string;
+  familyId: string;
   testMode: boolean;
 }>;
 
-export function AddItemForm({ requestedBy, testMode }: AddItemFormProps) {
+export function AddItemForm({ requestedBy, familyId, testMode }: AddItemFormProps) {
   const [values, setValues] = useState<FormValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
@@ -111,6 +112,8 @@ export function AddItemForm({ requestedBy, testMode }: AddItemFormProps) {
         status: "active",
         purchasedBy: null,
         purchasedAt: null,
+        rejectedBy: null,
+        rejectedAt: null,
       };
 
       writeLocalTestShoppingItems([...readLocalTestShoppingItems(), item]);
@@ -129,6 +132,7 @@ export function AddItemForm({ requestedBy, testMode }: AddItemFormProps) {
       quantity: values.quantity.trim(),
       features: values.features.trim() || null,
       requested_by: requestedBy,
+      family_id: familyId,
     });
 
     if (error) {

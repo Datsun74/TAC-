@@ -9,5 +9,5 @@ type FamilyAppShellProps = Readonly<{
 export async function FamilyAppShell({ children }: FamilyAppShellProps) {
   const member = await requireFamilyMember();
 
-  return <AppShell memberName={member.displayName} testMode={isLocalTestMode()}>{children}</AppShell>;
+  return <AppShell familyName={member.familyName} memberName={member.displayName} testMode={isLocalTestMode()}>{children}</AppShell>;
 }

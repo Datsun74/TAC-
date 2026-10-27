@@ -45,8 +45,15 @@ export function MagicLinkForm() {
       }
 
       setMessage("Посилання надіслано. Відкрийте лист у цьому браузері протягом години.");
-    } catch {
-      setErrorMessage("Не вдалося надіслати посилання. Перевірте email або спробуйте через хвилину.");
+    } catch (error) {
+      const technicalMessage = error instanceof Error ? error.message : "";
+      const isRateLimited = /rate limit|too many|over_email_send_rate_limit/i.test(technicalMessage);
+
+      setErrorMessage(
+        isRateLimited
+          ? "Supabase тимчасово обмежив надсилання листів. Зачекайте приблизно годину та надішліть лише одне нове посилання."
+          : "Не вдалося надіслати посилання. Перевірте email або спробуйте через хвилину.",
+      );
     } finally {
       setIsSubmitting(false);
     }

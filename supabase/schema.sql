@@ -15,7 +15,7 @@ $$;
 
 do $$
 begin
-  create type public.shopping_category as enum ('groceries', 'cosmetics', 'building', 'other');
+  create type public.shopping_category as enum ('groceries', 'cosmetics', 'building', 'serhii_personal', 'other');
 exception
   when duplicate_object then null;
 end
@@ -54,7 +54,7 @@ create table if not exists public.shopping_items (
 comment on table public.shopping_items is
   'Покупки та побажання однієї сім’ї. Доступ буде додано після вибору безпечного способу входу.';
 comment on column public.shopping_items.category is
-  'Основна категорія: groceries=Продукти, cosmetics=Косметика, building=Будівництво, other=Інше.';
+  'Основна категорія: groceries=Продукти, cosmetics=Косметика, building=Будівництво, serhii_personal=Сергій особисте, other=Інше.';
 comment on column public.shopping_items.store_section is
   'Відділ магазину в межах категорії, наприклад Молочні продукти, Алкоголь або ЗОЖ-товари.';
 comment on column public.shopping_items.requested_by is

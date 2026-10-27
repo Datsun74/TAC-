@@ -5,7 +5,7 @@ import type { ShoppingItem, ShoppingItemStatus } from "@/lib/shopping-item-types
 import { localTestItemsStorageKey } from "@/lib/test-mode";
 
 function getStatus(value: unknown): ShoppingItemStatus {
-  return value === "purchased" ? "purchased" : "active";
+  return value === "purchased" || value === "rejected" ? value : "active";
 }
 
 function toShoppingItem(value: unknown): ShoppingItem | null {
@@ -32,6 +32,9 @@ function toShoppingItem(value: unknown): ShoppingItem | null {
   const status = getStatus(item.status);
   const purchasedBy = status === "purchased" && typeof item.purchasedBy === "string" ? item.purchasedBy : null;
   const purchasedAt = status === "purchased" && typeof item.purchasedAt === "string" ? item.purchasedAt : null;
+  const rejectedBy = status === "rejected" && typeof item.rejectedBy === "string" ? item.rejectedBy : null;
+  const rejectedAt = status === "rejected" && typeof item.rejectedAt === "string" ? item.rejectedAt : null;
+  const resolvedStatus = purchasedBy && purchasedAt ? "purchased" : rejectedBy && rejectedAt ? "rejected" : "active";
 
   return {
     id: item.id,
@@ -42,9 +45,11 @@ function toShoppingItem(value: unknown): ShoppingItem | null {
     features: item.features,
     requestedBy: item.requestedBy,
     createdAt: item.createdAt,
-    status: purchasedBy && purchasedAt ? "purchased" : "active",
-    purchasedBy,
-    purchasedAt,
+    status: resolvedStatus,
+    purchasedBy: resolvedStatus === "purchased" ? purchasedBy : null,
+    purchasedAt: resolvedStatus === "purchased" ? purchasedAt : null,
+    rejectedBy: resolvedStatus === "rejected" ? rejectedBy : null,
+    rejectedAt: resolvedStatus === "rejected" ? rejectedAt : null,
   };
 }
 

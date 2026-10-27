@@ -1,6 +1,6 @@
 import type { ShoppingCategory } from "@/lib/shopping-categories";
 
-export type ShoppingItemStatus = "active" | "purchased";
+export type ShoppingItemStatus = "active" | "purchased" | "rejected";
 
 export type ShoppingItem = Readonly<{
   id: string;
@@ -14,6 +14,8 @@ export type ShoppingItem = Readonly<{
   status: ShoppingItemStatus;
   purchasedBy: string | null;
   purchasedAt: string | null;
+  rejectedBy: string | null;
+  rejectedAt: string | null;
 }>;
 
 export type ShoppingItemsResult =

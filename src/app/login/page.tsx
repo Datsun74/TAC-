@@ -4,10 +4,16 @@ import { redirect } from "next/navigation";
 import { MagicLinkForm } from "@/components/magic-link-form";
 import { isLocalTestMode } from "@/lib/test-mode";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ auth?: string }>;
+}) {
   if (isLocalTestMode()) {
     redirect("/");
   }
+
+  const { auth } = await searchParams;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center px-4 py-10 sm:px-6">
@@ -17,6 +23,11 @@ export default function LoginPage() {
         <p className="mt-4 leading-7 text-stone-600">
           Пароль не потрібен. Ми надішлемо одноразове посилання на ваш email. У списку буде видно лише ваше ім&apos;я, а не email.
         </p>
+        {auth === "failed" ? (
+          <p aria-live="assertive" className="mt-5 rounded-2xl bg-red-50 p-4 text-sm leading-6 text-red-800">
+            Вхід не підтвердився. Одноразове посилання може бути вже використане або перевірене захисним фільтром пошти. Не надсилайте кілька листів підряд.
+          </p>
+        ) : null}
         <MagicLinkForm />
         <p className="mt-6 text-sm leading-6 text-stone-500">
           Перший вхід нового члена сім&apos;ї потребує підтвердження доступу.

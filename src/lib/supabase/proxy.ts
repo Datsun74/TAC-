@@ -4,7 +4,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSupabasePublicConfig } from "@/lib/supabase";
 import { isLocalTestMode } from "@/lib/test-mode";
 
-const protectedRoutes = new Set(["/", "/purchases", "/add", "/shopping", "/purchased"]);
+const protectedRoutes = new Set(["/", "/purchases", "/add", "/shopping", "/purchased", "/rejected", "/family"]);
 
 function copySessionCookies(source: NextResponse, target: NextResponse) {
   source.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
