@@ -16,6 +16,10 @@
 # next.js
 /.next/
 /out/
+**/.next/
+
+# Nested standalone applications
+**/node_modules/
 
 # production
 /build
@@ -40,3 +44,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

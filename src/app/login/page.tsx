@@ -21,11 +21,11 @@ export default async function LoginPage({
         <p className="text-sm font-semibold tracking-[0.16em] text-amber-800 uppercase">Спільний простір</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">Вхід до сімейного списку</h1>
         <p className="mt-4 leading-7 text-stone-600">
-          Пароль не потрібен. Ми надішлемо одноразове посилання на ваш email. У списку буде видно лише ваше ім&apos;я, а не email.
+          Пароль не потрібен. Ми надішлемо одноразовий код на ваш email. У списку буде видно лише ваше ім&apos;я, а не email.
         </p>
         {auth === "failed" ? (
           <p aria-live="assertive" className="mt-5 rounded-2xl bg-red-50 p-4 text-sm leading-6 text-red-800">
-            Вхід не підтвердився. Одноразове посилання може бути вже використане або перевірене захисним фільтром пошти. Не надсилайте кілька листів підряд.
+            Вхід не підтвердився. Введіть код із найновішого листа або надішліть новий код після завершення відліку.
           </p>
         ) : null}
         <MagicLinkForm />
