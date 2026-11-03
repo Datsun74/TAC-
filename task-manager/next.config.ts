@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 
 const repositoryRoot = path.join(__dirname, "..");
 const sharedSourceDirectory = path.join(repositoryRoot, "src");
+const taskManagerNodeModules = path.join(__dirname, "node_modules");
 
 const nextConfig: NextConfig = {
   // The task manager is a separate Next.js application in this repository.
@@ -26,6 +27,13 @@ const nextConfig: NextConfig = {
       ...config.resolve.alias,
       "@": sharedSourceDirectory,
     };
+    // Vercel installs dependencies inside `task-manager/node_modules`, while
+    // the shared source lives one directory higher. Add the app's dependency
+    // directory explicitly so those shared files can resolve Supabase.
+    config.resolve.modules = [
+      taskManagerNodeModules,
+      ...(config.resolve.modules ?? []),
+    ];
 
     return config;
   },
