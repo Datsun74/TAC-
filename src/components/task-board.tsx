@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { Fragment, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 import { readLocalTestTasks, writeLocalTestTasks } from "@/lib/local-test-tasks";
@@ -143,6 +143,10 @@ function emptyMessage(view: TaskBoardProps["view"]) {
   return "Активних, виконуваних або відкладених задач поки немає.";
 }
 
+function participantLabel(task: Task) {
+  return Array.from(new Set([task.createdByName, ...task.participants.map((participant) => participant.name)])).join(", ");
+}
+
 export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps) {
   const router = useRouter();
   const localTasks = useSyncExternalStore(
@@ -218,76 +222,79 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
           {view !== "history" ? <Link className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-amber-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-900" href="/tasks/add">Створити задачу</Link> : null}
         </section>
       ) : (
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          {visibleTasks.map((task) => (
-            <article className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6" key={task.id}>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-950">{taskAreaLabels[task.area]}</span>
-                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-700">{taskHorizonLabels[task.horizon]}</span>
-                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-700">{task.scopeName}</span>
-                    {task.status !== "active" ? <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-700">{taskStatusLabels[task.status]}</span> : null}
-                  </div>
-                  {testMode ? (
-                    <h2 className="mt-4 text-xl font-semibold tracking-tight text-stone-950">{task.title}</h2>
-                  ) : (
-                    <h2 className="mt-4 text-xl font-semibold tracking-tight text-stone-950"><Link className="hover:text-amber-800 hover:underline" href={"/tasks/" + task.id}>{task.title}</Link></h2>
-                  )}
-                </div>
-                {task.dueDate ? <p className="shrink-0 text-right text-xs font-semibold text-stone-600">До<br />{formatTaskDate(task.dueDate)}</p> : null}
-              </div>
-
-              {task.goal ? <p className="mt-3 text-sm leading-6 text-stone-600">{task.goal}</p> : null}
-
-              <dl className="mt-5 grid gap-3 border-t border-stone-100 pt-4 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-stone-500">Створив</dt>
-                  <dd className="mt-1 font-medium text-stone-800">{task.createdByName}</dd>
-                </div>
-                <div>
-                  <dt className="text-stone-500">{task.participants.length > 0 ? "Учасники" : "Доступ"}</dt>
-                  <dd className="mt-1 font-medium text-stone-800">{task.participants.length > 0 ? task.participants.map((participant) => participant.name).join(", ") : "Особиста задача"}</dd>
-                </div>
-                {task.status === "postponed" && task.postponedUntil ? <div className="sm:col-span-2"><dt className="text-stone-500">Відкладено до</dt><dd className="mt-1 font-medium text-stone-800">{formatTaskDate(task.postponedUntil)}</dd></div> : null}
-                {task.status === "completed" && task.completedBy && task.completedAt ? <div className="sm:col-span-2"><dt className="text-stone-500">Виконав</dt><dd className="mt-1 font-medium text-stone-800">{task.completedBy}</dd></div> : null}
-                {task.status === "rejected" && task.rejectedBy ? <div className="sm:col-span-2"><dt className="text-stone-500">Відхилив</dt><dd className="mt-1 font-medium text-stone-800">{task.rejectedBy}</dd></div> : null}
-              </dl>
-
-              {view !== "history" ? (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {task.status === "active" ? (
-                    <>
-                      <button className="min-h-10 rounded-full bg-amber-800 px-4 text-sm font-semibold text-white transition-colors hover:bg-amber-900 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "in_progress")} type="button">Взяти в роботу</button>
-                      <button className="min-h-10 rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "completed")} type="button">Виконано</button>
-                      <button className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => startPostponing(task)} type="button">Відкласти</button>
-                      <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "rejected")} type="button">Відхилити</button>
-                    </>
-                  ) : task.status === "in_progress" ? (
-                    <>
-                      <button className="min-h-10 rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "completed")} type="button">Виконано</button>
-                      <button className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => startPostponing(task)} type="button">Відкласти</button>
-                      <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "active")} type="button">Повернути в план</button>
-                    </>
-                  ) : (
-                    <button className="min-h-10 rounded-full border border-amber-800 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "active")} type="button">Повернути в активні</button>
-                  )}
-                </div>
-              ) : null}
-
-              {postponingTaskId === task.id ? (
-                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <label className="block text-sm font-semibold text-amber-950" htmlFor={`postpone-${task.id}`}>Відкласти до дати</label>
-                  <p className="mt-1 text-sm text-amber-900">Задача зникне з активного списку, але залишиться у плані та повернеться до роботи у вибраний день.</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <input className="min-h-11 rounded-xl border border-amber-300 bg-white px-3 text-sm font-semibold text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-200" id={`postpone-${task.id}`} min={currentDate()} onChange={(event) => setPostponeDate(event.target.value)} type="date" value={postponeDate} />
-                    <button className="min-h-11 rounded-full bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id || !postponeDate} onClick={() => void updateStatus(task, "postponed", postponeDate)} type="button">Підтвердити</button>
-                    <button className="min-h-11 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-amber-100" disabled={isUpdating === task.id} onClick={() => setPostponingTaskId(null)} type="button">Скасувати</button>
-                  </div>
-                </div>
-              ) : null}
-            </article>
-          ))}
+        <div className="mt-6 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-[76rem] w-full border-collapse text-left text-sm">
+              <caption className="sr-only">Список задач</caption>
+              <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-600">
+                <tr>
+                  <th className="min-w-72 px-5 py-3 font-semibold" scope="col">Задача</th>
+                  <th className="px-4 py-3 font-semibold" scope="col">Напрям</th>
+                  <th className="px-4 py-3 font-semibold" scope="col">Планування</th>
+                  <th className="min-w-44 px-4 py-3 font-semibold" scope="col">Учасники</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-semibold" scope="col">Строк</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-semibold" scope="col">Стан</th>
+                  <th className="px-4 py-3 font-semibold"><span className="sr-only">Дії</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleTasks.map((task) => (
+                  <Fragment key={task.id}>
+                    <tr className="border-t border-stone-100 align-top transition-colors hover:bg-stone-50/80">
+                      <th className="px-5 py-4 font-semibold text-stone-950" scope="row">
+                        {testMode ? task.title : <Link className="hover:text-amber-800 hover:underline" href={`/tasks/${task.id}`}>{task.title}</Link>}
+                        {task.goal ? <p className="mt-1 max-w-xl font-normal leading-5 text-stone-600">{task.goal}</p> : null}
+                        <p className="mt-2 text-xs font-normal text-stone-500">{task.scopeName}</p>
+                      </th>
+                      <td className="whitespace-nowrap px-4 py-4 text-stone-800">{taskAreaLabels[task.area]}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-stone-800">{taskHorizonLabels[task.horizon]}</td>
+                      <td className="px-4 py-4 leading-5 text-stone-800">{participantLabel(task)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-stone-800">
+                        {task.status === "postponed" && task.postponedUntil ? `До ${formatTaskDate(task.postponedUntil)}` : task.dueDate ? formatTaskDate(task.dueDate) : "Без дати"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-4"><span className={"rounded-full px-2.5 py-1 text-xs font-semibold " + (task.status === "completed" ? "bg-emerald-100 text-emerald-900" : task.status === "rejected" ? "bg-red-50 text-red-800" : task.status === "postponed" ? "bg-amber-100 text-amber-950" : task.status === "in_progress" ? "bg-sky-100 text-sky-900" : "bg-stone-100 text-stone-700")}>{taskStatusLabels[task.status]}</span></td>
+                      <td className="px-4 py-3">
+                        {view !== "history" ? (
+                          <div className="flex min-w-max flex-wrap gap-2">
+                            {task.status === "active" ? (
+                              <>
+                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-amber-800 px-3 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "in_progress")} type="button">В роботу</button>
+                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full bg-emerald-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "completed")} type="button">Виконано</button>
+                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => startPostponing(task)} type="button">Відкласти</button>
+                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full px-2 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "rejected")} type="button">Відхилити</button>
+                              </>
+                            ) : task.status === "in_progress" ? (
+                              <>
+                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full bg-emerald-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "completed")} type="button">Виконано</button>
+                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => startPostponing(task)} type="button">Відкласти</button>
+                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full px-2 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "active")} type="button">У план</button>
+                              </>
+                            ) : (
+                              <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-amber-800 px-3 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "active")} type="button">Активувати</button>
+                            )}
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                    {postponingTaskId === task.id ? (
+                      <tr className="border-t border-amber-100 bg-amber-50">
+                        <td className="px-5 py-4" colSpan={7}>
+                          <div className="flex flex-wrap items-end gap-3">
+                            <div>
+                              <label className="block text-sm font-semibold text-amber-950" htmlFor={`postpone-${task.id}`}>Відкласти до дати</label>
+                              <input className="mt-2 min-h-11 rounded-xl border border-amber-300 bg-white px-3 text-sm font-semibold text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-200" id={`postpone-${task.id}`} min={currentDate()} onChange={(event) => setPostponeDate(event.target.value)} type="date" value={postponeDate} />
+                            </div>
+                            <button className="min-h-11 rounded-full bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id || !postponeDate} onClick={() => void updateStatus(task, "postponed", postponeDate)} type="button">Підтвердити</button>
+                            <button className="min-h-11 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-amber-100" disabled={isUpdating === task.id} onClick={() => setPostponingTaskId(null)} type="button">Скасувати</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </>
