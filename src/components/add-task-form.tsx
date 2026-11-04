@@ -247,17 +247,24 @@ export function AddTaskForm({ currentMember, spaces, testMode }: AddTaskFormProp
 
         <fieldset>
           <legend className="text-sm font-semibold text-stone-900">Учасники</legend>
-          <p className="mt-1 text-sm text-stone-500">Ви — автор задачі. Позначте тих, хто має бачити та виконувати її разом з вами.</p>
-          {availableParticipants.length > 0 ? (
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <p className="mt-1 text-sm text-stone-500">Ви вже є автором і першим учасником. За потреби додайте тих, хто має бачити та виконувати задачу разом з вами.</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-950">
+              <input checked className="size-4 accent-amber-800" disabled readOnly type="checkbox" />
+              <span>{currentMember.name} <span className="font-normal text-amber-900">— ви, автор</span></span>
+            </label>
+            {availableParticipants.length > 0 ? (
+              <>
               {availableParticipants.map((member) => (
                 <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-stone-200 px-4 text-sm font-medium text-stone-800" key={member.id}>
                   <input checked={values.participantIds.includes(member.id)} className="size-4 accent-amber-800" onChange={() => toggleParticipant(member.id)} type="checkbox" />
                   {member.name}
                 </label>
               ))}
-            </div>
-          ) : <p className="mt-3 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-600">{selectedSpace ? "Поки що у цьому просторі немає інших активних учасників. Задача буде особистою." : "Спершу оберіть простір задачі."}</p>}
+              </>
+            ) : null}
+          </div>
+          {availableParticipants.length === 0 ? <p className="mt-3 text-sm text-stone-500">Інших активних учасників у цьому просторі поки немає. Задача буде особистою.</p> : null}
         </fieldset>
       </div>
 
