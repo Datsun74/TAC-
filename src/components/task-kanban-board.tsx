@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 
 import { readLocalTestTasks } from "@/lib/local-test-tasks";
-import { formatTaskDate, taskAreaLabels, taskAreaOptions, taskHorizonLabels, taskHorizonOptions, taskStatusLabels } from "@/lib/task-options";
+import { taskAreaOptions, taskHorizonOptions, taskStatusLabels } from "@/lib/task-options";
 import type { Task, TaskArea, TaskHorizon, TaskStatus } from "@/types/task";
 
 type TaskKanbanBoardProps = Readonly<{
@@ -28,11 +28,6 @@ function peopleForTask(task: Task) {
   return Array.from(new Set([task.createdByName, ...task.participants.map((participant) => participant.name)]));
 }
 
-function deadlineLabel(task: Task) {
-  if (task.status === "postponed" && task.postponedUntil) return `До ${formatTaskDate(task.postponedUntil)}`;
-  return task.dueDate ? formatTaskDate(task.dueDate) : "Без дати";
-}
-
 function columnStyle(status: TaskStatus) {
   if (status === "completed") return "border-emerald-200 bg-emerald-50/60";
   if (status === "rejected") return "border-red-200 bg-red-50/60";
@@ -46,12 +41,8 @@ function taskCard(task: Task, testMode: boolean) {
   const title = testMode ? task.title : <Link className="font-semibold text-stone-950 hover:text-amber-800 hover:underline" href={`/tasks/${task.id}`}>{task.title}</Link>;
 
   return (
-    <article className="rounded-2xl border border-white bg-white p-3.5 shadow-sm">
-      <h3 className="text-sm leading-5">{title}</h3>
-      {task.goal ? <p className="mt-1 text-xs leading-5 text-stone-600">{task.goal}</p> : null}
-      <p className="mt-3 text-xs font-medium text-stone-800">{taskHorizonLabels[task.horizon]} · {taskAreaLabels[task.area]}</p>
-      <p className="mt-1 text-xs text-stone-600">Строк: {deadlineLabel(task)}</p>
-      <p className="mt-2 line-clamp-2 text-xs leading-5 text-stone-600">{peopleForTask(task).join(", ")}</p>
+    <article className="rounded-xl border border-white bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
+      <h3 className="break-words text-sm leading-5">{title}</h3>
     </article>
   );
 }
@@ -133,13 +124,11 @@ export function TaskKanbanBoard({ tasks, testMode }: TaskKanbanBoardProps) {
             })}
           </div>
 
-          <div className="mt-6 hidden overflow-x-auto pb-4 lg:block">
-            <div className="flex min-w-max gap-4">
+          <div className="mt-6 hidden lg:grid lg:grid-cols-6 lg:gap-3">
               {columns.map((status) => {
                 const columnTasks = visibleTasks.filter((task) => task.status === status);
-                return <section className={"w-72 shrink-0 rounded-2xl border p-3 " + columnStyle(status)} key={status}><div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-stone-950">{taskStatusLabels[status]}</h2><span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-stone-700">{columnTasks.length}</span></div><div className="mt-3 space-y-3">{columnTasks.length > 0 ? columnTasks.map((task) => <div key={task.id}>{taskCard(task, testMode)}</div>) : <p className="rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Немає задач.</p>}</div></section>;
+                return <section className={"min-w-0 rounded-2xl border p-3 " + columnStyle(status)} key={status}><div className="flex items-center justify-between gap-2"><h2 className="min-w-0 text-sm font-semibold leading-5 text-stone-950">{taskStatusLabels[status]}</h2><span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-stone-700">{columnTasks.length}</span></div><div className="mt-3 space-y-3">{columnTasks.length > 0 ? columnTasks.map((task) => <div key={task.id}>{taskCard(task, testMode)}</div>) : <p className="rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Немає задач.</p>}</div></section>;
               })}
-            </div>
           </div>
         </>
       )}
