@@ -20,6 +20,11 @@ type FormValues = {
 
 type FormErrors = Partial<Record<keyof Omit<FormValues, "participantIds">, string>>;
 
+type DatabaseError = Readonly<{
+  code?: string;
+  message?: string;
+}>;
+
 type AddTaskFormProps = Readonly<{
   currentMember: TaskMember;
   spaces: readonly TaskSpace[];
@@ -48,6 +53,22 @@ function validate(values: FormValues): FormErrors {
   }
 
   return errors;
+}
+
+function saveErrorMessage(error: DatabaseError | null) {
+  if (error?.code === "PGRST202" || error?.code === "42883") {
+    return "Для збереження задач виконайте файл supabase/task-create-reliability.sql у Supabase SQL Editor, а потім повторіть спробу.";
+  }
+
+  if (error?.code === "42501") {
+    return "Supabase не підтвердив право на створення задачі. Оновіть сторінку, увійдіть знову й повторіть спробу. Якщо не допоможе — виконайте файл налаштування задачника.";
+  }
+
+  if (error?.code === "23514" || error?.code === "23502") {
+    return "Не вдалося зберегти дані задачі. Перевірте назву, напрям, рівень планування та вибраний простір.";
+  }
+
+  return "Не вдалося зберегти задачу. Спробуйте ще раз після оновлення сторінки.";
 }
 
 export function AddTaskForm({ currentMember, spaces, testMode }: AddTaskFormProps) {
@@ -133,43 +154,24 @@ export function AddTaskForm({ currentMember, spaces, testMode }: AddTaskFormProp
     }
 
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert({
-        family_id: selectedSpace.kind === "family" ? selectedSpace.id : null,
-        workspace_id: selectedSpace.kind === "workspace" ? selectedSpace.id : null,
-        created_by: currentMember.id,
-        created_by_name: currentMember.name,
-        title: task.title,
-        goal: task.goal,
-        area: task.area,
-        horizon: task.horizon,
-        due_date: task.dueDate,
-      })
-      .select("id")
-      .single();
+    // A single database operation keeps the task and its participants atomic:
+    // no partially-created task is left behind if an invited person cannot be added.
+    const { error } = await supabase.rpc("create_task_with_participants", {
+      target_family_id: selectedSpace.kind === "family" ? selectedSpace.id : null,
+      target_workspace_id: selectedSpace.kind === "workspace" ? selectedSpace.id : null,
+      task_title: task.title,
+      task_goal: task.goal,
+      task_area: task.area,
+      task_horizon: task.horizon,
+      task_due_date: task.dueDate,
+      creator_display_name: currentMember.name,
+      participant_user_ids: selectedParticipants.map((member) => member.id),
+    });
 
-    if (error || !data) {
-      setSubmissionError("Не вдалося зберегти задачу. Перевірте, чи виконано файл налаштування задачника.");
+    if (error) {
+      setSubmissionError(saveErrorMessage(error));
       setIsSubmitting(false);
       return;
-    }
-
-    if (selectedParticipants.length > 0) {
-      const { error: participantsError } = await supabase.from("task_participants").insert(
-        selectedParticipants.map((member) => ({
-          task_id: data.id,
-          member_user_id: member.id,
-          member_name: member.name,
-        })),
-      );
-
-      if (participantsError) {
-        await supabase.from("tasks").delete().eq("id", data.id);
-        setSubmissionError("Не вдалося додати учасників, тому задачу не збережено. Спробуйте ще раз.");
-        setIsSubmitting(false);
-        return;
-      }
     }
 
     router.push("/tasks/list");

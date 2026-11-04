@@ -18,10 +18,11 @@
 2. Виконайте вміст файлу supabase/tasks.sql.
 3. Якщо tasks.sql вже був виконаний до появи статусу «У процесі», виконайте supabase/tasks-status-in-progress.sql.
 4. Щоб увімкнути робочі простори та працівників, виконайте supabase/task-workspaces.sql.
-5. Щоб увімкнути чеклісти, виконайте supabase/task-checklists.sql.
-6. Не виконуйте `supabase/tasks-attachments.sql` для стартової версії: вкладення та архів відкладені.
-7. У `task-manager` створіть `.env.local` з тими самими `NEXT_PUBLIC_SUPABASE_URL` і `NEXT_PUBLIC_SUPABASE_ANON_KEY`, що використовує застосунок покупок.
-8. Запустіть `npm --prefix task-manager run dev` та відкрийте `/tasks`.
+5. Виконайте `supabase/task-create-reliability.sql`. Він забезпечує атомарне збереження задачі разом з її учасниками.
+6. Щоб увімкнути чеклісти, виконайте supabase/task-checklists.sql.
+7. Не виконуйте `supabase/tasks-attachments.sql` для стартової версії: вкладення та архів відкладені.
+8. У `task-manager` створіть `.env.local` з тими самими `NEXT_PUBLIC_SUPABASE_URL` і `NEXT_PUBLIC_SUPABASE_ANON_KEY`, що використовує застосунок покупок.
+9. Запустіть `npm --prefix task-manager run dev` та відкрийте `/tasks`.
 
 Таблиця задач має окремі RLS-політики: користувач бачить лише власні задачі та ті, у яких його додали учасником.
 
