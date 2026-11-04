@@ -18,7 +18,7 @@ type TaskBoardProps = Readonly<{
 
 type UpdateKind = TaskStatus;
 
-const taskControlClass = "inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border px-3 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60";
+const taskControlClass = "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold leading-4 transition-colors disabled:cursor-wait disabled:opacity-60";
 const horizonOrder: Record<TaskHorizon, number> = { tactical: 0, operational: 1, strategic: 2 };
 const areaOrder: Record<TaskArea, number> = { work: 0, family: 1, personal: 2 };
 
@@ -125,7 +125,7 @@ function TaskActions({ task, view, isUpdating, onUpdate, onStartPostponing }: Ta
   const rejectButton = <button className={taskControlClass + " border-transparent px-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"} disabled={isUpdating} onClick={() => onUpdate(task, "rejected")} type="button">Відхилити</button>;
 
   if (task.status === "active") {
-    return <><button className={taskControlClass + " border-amber-800 text-amber-900 hover:bg-amber-50"} disabled={isUpdating} onClick={() => onUpdate(task, "in_work")} type="button">Взяти в роботу</button>{postponeButton}{rejectButton}</>;
+    return <><button className={taskControlClass + " border-amber-800 text-amber-900 hover:bg-amber-50"} disabled={isUpdating} onClick={() => onUpdate(task, "in_work")} type="button">У роботу</button>{postponeButton}{rejectButton}</>;
   }
 
   if (task.status === "in_work") {
@@ -263,16 +263,16 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
         </section>
       ) : (
         <>
-          <div className="mt-6 space-y-3 xl:hidden">
+          <div className="mt-5 space-y-2 xl:hidden">
             {visibleTasks.map((task) => (
-              <article className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm" key={task.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0"><h2 className="font-semibold text-stone-950">{taskTitle(task)}</h2>{task.goal ? <p className="mt-1 text-sm leading-5 text-stone-600">{task.goal}</p> : null}</div>
-                  <span className={"shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span>
+              <article className="rounded-xl border border-stone-200 bg-white p-3 shadow-sm" key={task.id}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0"><h2 className="text-sm font-semibold leading-5 text-stone-950">{taskTitle(task)}</h2>{task.goal ? <p className="mt-0.5 text-xs leading-4 text-stone-600">{task.goal}</p> : null}</div>
+                  <span className={"shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold leading-4 " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span>
                 </div>
-                <div className="mt-3 grid gap-1 text-sm leading-5 text-stone-700"><p><span className="font-medium text-stone-950">{taskHorizonLabels[task.horizon]}</span> · {taskAreaLabels[task.area]}</p><p>Строк: {deadlineLabel(task)}</p><p className="text-stone-600">Учасники: {participantLabel(task)}</p></div>
-                <div className="mt-4 flex flex-wrap gap-2"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div>
-                {postponingTaskId === task.id ? <div className="mt-4 border-t border-amber-100 pt-4"><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></div> : null}
+                <div className="mt-2 grid gap-0.5 text-xs leading-4 text-stone-700"><p><span className="font-medium text-stone-950">{taskHorizonLabels[task.horizon]}</span> · {taskAreaLabels[task.area]}</p><p>Строк: {deadlineLabel(task)}</p><p className="text-stone-600">Учасники: {participantLabel(task)}</p></div>
+                <div className="mt-2.5 flex flex-wrap gap-1.5"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div>
+                {postponingTaskId === task.id ? <div className="mt-3 border-t border-amber-100 pt-3"><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></div> : null}
               </article>
             ))}
           </div>
@@ -283,7 +283,7 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
                 <colgroup><col className="w-[23%]" /><col className="w-[8%]" /><col className="w-[12%]" /><col className="w-[15%]" /><col className="w-[12%]" /><col className="w-[10%]" /><col className="w-[20%]" /></colgroup>
                 <thead className="bg-stone-50 text-[11px] uppercase tracking-wide text-stone-600"><tr><th className="px-3 py-3 font-semibold" scope="col">Задача</th><th className="px-3 py-3 font-semibold" scope="col">Напрям</th><th className="px-3 py-3 font-semibold" scope="col">Планування</th><th className="px-3 py-3 font-semibold" scope="col">Учасники</th><th className="px-3 py-3 font-semibold" scope="col">Строк</th><th className="px-3 py-3 font-semibold" scope="col">Стан</th><th className="px-3 py-3 font-semibold"><span className="sr-only">Дії</span></th></tr></thead>
                 <tbody>
-                  {visibleTasks.map((task) => <Fragment key={task.id}><tr className="border-t border-stone-100 align-top transition-colors hover:bg-stone-50/80"><th className="break-words px-3 py-4 font-semibold text-stone-950" scope="row">{taskTitle(task)}{task.goal ? <p className="mt-1 font-normal leading-5 text-stone-600">{task.goal}</p> : null}<p className="mt-2 text-xs font-normal text-stone-500">{task.scopeName}</p></th><td className="break-words px-3 py-4 text-stone-800">{taskAreaLabels[task.area]}</td><td className="break-words px-3 py-4 text-stone-800">{taskHorizonLabels[task.horizon]}</td><td className="break-words px-3 py-4 leading-5 text-stone-800">{participantLabel(task)}</td><td className="break-words px-3 py-4 text-stone-800">{deadlineLabel(task)}</td><td className="px-3 py-4"><span className={"inline-block rounded-full px-2.5 py-1 text-xs font-semibold " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span></td><td className="px-3 py-3"><div className="flex flex-col items-stretch gap-1"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div></td></tr>{postponingTaskId === task.id ? <tr className="border-t border-amber-100 bg-amber-50"><td className="px-5 py-4" colSpan={7}><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></td></tr> : null}</Fragment>)}
+                  {visibleTasks.map((task) => <Fragment key={task.id}><tr className="border-t border-stone-100 align-top transition-colors hover:bg-stone-50/80"><th className="break-words px-3 py-3 font-semibold text-stone-950" scope="row">{taskTitle(task)}{task.goal ? <p className="mt-0.5 font-normal leading-5 text-stone-600">{task.goal}</p> : null}<p className="mt-1 text-xs font-normal text-stone-500">{task.scopeName}</p></th><td className="break-words px-3 py-3 text-stone-800">{taskAreaLabels[task.area]}</td><td className="break-words px-3 py-3 text-stone-800">{taskHorizonLabels[task.horizon]}</td><td className="break-words px-3 py-3 leading-5 text-stone-800">{participantLabel(task)}</td><td className="break-words px-3 py-3 text-stone-800">{deadlineLabel(task)}</td><td className="px-3 py-3"><span className={"inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span></td><td className="px-3 py-2"><div className="flex flex-col items-stretch gap-1"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div></td></tr>{postponingTaskId === task.id ? <tr className="border-t border-amber-100 bg-amber-50"><td className="px-5 py-4" colSpan={7}><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></td></tr> : null}</Fragment>)}
                 </tbody>
               </table>
           </div>
