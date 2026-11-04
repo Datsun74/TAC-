@@ -1,15 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { type DragEvent, useMemo, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 
-import { readLocalTestTasks } from "@/lib/local-test-tasks";
+import { readLocalTestTasks, writeLocalTestTasks } from "@/lib/local-test-tasks";
 import { taskAreaOptions, taskHorizonOptions, taskStatusLabels } from "@/lib/task-options";
+import { createClient } from "@/lib/supabase/client";
 import type { Task, TaskArea, TaskHorizon, TaskStatus } from "@/types/task";
 
 type TaskKanbanBoardProps = Readonly<{
   tasks: readonly Task[];
+  memberName: string;
   testMode: boolean;
+}>;
+
+type TaskCardProps = Readonly<{
+  task: Task;
+  testMode: boolean;
+  isMoving: boolean;
+  onDragStart: (event: DragEvent<HTMLElement>, task: Task) => void;
+  onDragEnd: () => void;
 }>;
 
 const columns: readonly TaskStatus[] = ["active", "in_work", "in_progress", "postponed", "completed", "rejected"];
@@ -18,6 +29,16 @@ const areaOrder: Record<TaskArea, number> = { work: 0, family: 1, personal: 2 };
 
 function subscribeToLocalTasks() {
   return () => {};
+}
+
+function oneMonthFromNow() {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(1);
+  date.setMonth(date.getMonth() + 1);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return date.getFullYear() + "-" + month + "-" + day;
 }
 
 function toggleChoice<T extends string>(current: readonly T[], choice: T) {
@@ -37,26 +58,64 @@ function columnStyle(status: TaskStatus) {
   return "border-stone-200 bg-stone-50";
 }
 
-function taskCard(task: Task, testMode: boolean) {
-  const title = testMode ? task.title : <Link className="font-semibold text-stone-950 hover:text-amber-800 hover:underline" href={`/tasks/${task.id}`}>{task.title}</Link>;
+function taskWithStatus(task: Task, status: TaskStatus, memberName: string): Task {
+  const changedAt = new Date().toISOString();
+
+  if (status === "completed") {
+    return { ...task, status, postponedUntil: null, completedBy: memberName, completedAt: changedAt, rejectedBy: null, rejectedAt: null };
+  }
+
+  if (status === "rejected") {
+    return { ...task, status, postponedUntil: null, completedBy: null, completedAt: null, rejectedBy: memberName, rejectedAt: changedAt };
+  }
+
+  if (status === "postponed") {
+    return { ...task, status, postponedUntil: task.postponedUntil ?? oneMonthFromNow(), completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null };
+  }
+
+  return { ...task, status, postponedUntil: null, completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null };
+}
+
+function taskUpdate(task: Task) {
+  return {
+    status: task.status,
+    postponed_until: task.postponedUntil,
+    completed_by: task.completedBy,
+    completed_at: task.completedAt,
+    rejected_by: task.rejectedBy,
+    rejected_at: task.rejectedAt,
+  };
+}
+
+function TaskCard({ task, testMode, isMoving, onDragStart, onDragEnd }: TaskCardProps) {
+  const title = testMode
+    ? task.title
+    : <Link className="font-semibold text-stone-950 hover:text-amber-800 hover:underline" draggable={false} href={`/tasks/${task.id}`}>{task.title}</Link>;
 
   return (
-    <article className="rounded-xl border border-white bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
+    <article aria-label={`Перетягнути задачу «${task.title}»`} className={`cursor-grab rounded-xl border border-white bg-white p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing ${isMoving ? "opacity-45" : ""}`} draggable={!isMoving} onDragEnd={onDragEnd} onDragStart={(event) => onDragStart(event, task)}>
       <h3 className="break-words text-sm leading-5">{title}</h3>
     </article>
   );
 }
 
-export function TaskKanbanBoard({ tasks, testMode }: TaskKanbanBoardProps) {
+export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoardProps) {
+  const router = useRouter();
   const localTasks = useSyncExternalStore(subscribeToLocalTasks, () => (testMode ? readLocalTestTasks() : tasks), () => tasks);
+  const [overriddenItems, setOverriddenItems] = useState<readonly Task[] | null>(null);
   const [selectedAreas, setSelectedAreas] = useState<readonly TaskArea[]>([]);
   const [selectedHorizons, setSelectedHorizons] = useState<readonly TaskHorizon[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<readonly string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
+  const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const items = overriddenItems ?? localTasks;
   const filtersApplied = selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedPeople.length > 0;
 
-  const people = useMemo(() => Array.from(new Set(localTasks.flatMap(peopleForTask))).sort((left, right) => left.localeCompare(right, "uk")), [localTasks]);
-  const visibleTasks = useMemo(() => localTasks
+  const people = useMemo(() => Array.from(new Set(items.flatMap(peopleForTask))).sort((left, right) => left.localeCompare(right, "uk")), [items]);
+  const visibleTasks = useMemo(() => items
     .filter((task) => selectedAreas.length === 0 || selectedAreas.includes(task.area))
     .filter((task) => selectedHorizons.length === 0 || selectedHorizons.includes(task.horizon))
     .filter((task) => selectedPeople.length === 0 || peopleForTask(task).some((person) => selectedPeople.includes(person)))
@@ -66,12 +125,73 @@ export function TaskKanbanBoard({ tasks, testMode }: TaskKanbanBoardProps) {
       const areaDifference = areaOrder[left.area] - areaOrder[right.area];
       if (areaDifference !== 0) return areaDifference;
       return (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31") || left.createdAt.localeCompare(right.createdAt);
-    }), [localTasks, selectedAreas, selectedHorizons, selectedPeople]);
+    }), [items, selectedAreas, selectedHorizons, selectedPeople]);
 
   function clearFilters() {
     setSelectedAreas([]);
     setSelectedHorizons([]);
     setSelectedPeople([]);
+  }
+
+  function startDragging(event: DragEvent<HTMLElement>, task: Task) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", task.id);
+    setError("");
+    setDraggedTaskId(task.id);
+  }
+
+  async function moveTask(taskId: string, status: TaskStatus) {
+    const task = items.find((item) => item.id === taskId);
+    if (!task || task.status === status) return;
+
+    const previousItems = items;
+    const updatedTask = taskWithStatus(task, status, memberName);
+    const updatedItems = items.map((item) => (item.id === taskId ? updatedTask : item));
+    setError("");
+    setMovingTaskId(taskId);
+    setOverriddenItems(updatedItems);
+
+    if (testMode) {
+      writeLocalTestTasks(updatedItems);
+      setMovingTaskId(null);
+      return;
+    }
+
+    const { error: updateError } = await createClient().from("tasks").update(taskUpdate(updatedTask)).eq("id", taskId);
+    if (updateError) {
+      setOverriddenItems(previousItems);
+      setError("Не вдалося змінити стан задачі. Спробуйте перемістити її ще раз.");
+    } else {
+      router.refresh();
+    }
+    setMovingTaskId(null);
+  }
+
+  function allowDrop(event: DragEvent<HTMLElement>, status: TaskStatus) {
+    if (!draggedTaskId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropTargetStatus(status);
+  }
+
+  function dropTask(event: DragEvent<HTMLElement>, status: TaskStatus) {
+    event.preventDefault();
+    const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId;
+    setDraggedTaskId(null);
+    setDropTargetStatus(null);
+    if (taskId) void moveTask(taskId, status);
+  }
+
+  function renderColumn(status: TaskStatus) {
+    const columnTasks = visibleTasks.filter((task) => task.status === status);
+    const isDropTarget = dropTargetStatus === status && draggedTaskId !== null;
+
+    return (
+      <section className={`${columnStyle(status)} ${isDropTarget ? "ring-2 ring-amber-700 ring-offset-2" : ""} min-w-0 rounded-2xl border p-3 transition-shadow`} key={status} onDragOver={(event) => allowDrop(event, status)} onDrop={(event) => dropTask(event, status)}>
+        <div className="flex items-center justify-between gap-2"><h2 className="min-w-0 text-sm font-semibold leading-5 text-stone-950">{taskStatusLabels[status]}</h2><span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-stone-700">{columnTasks.length}</span></div>
+        <div className="mt-3 space-y-3">{columnTasks.length > 0 ? columnTasks.map((task) => <TaskCard isMoving={movingTaskId === task.id} key={task.id} onDragEnd={() => { setDraggedTaskId(null); setDropTargetStatus(null); }} onDragStart={startDragging} task={task} testMode={testMode} />) : <p className="rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Перетягніть сюди задачу.</p>}</div>
+      </section>
+    );
   }
 
   return (
@@ -80,7 +200,7 @@ export function TaskKanbanBoard({ tasks, testMode }: TaskKanbanBoardProps) {
         <div className="flex flex-wrap items-center gap-2">
           <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedPeople.length})` : ""}</button>
           {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={clearFilters} type="button">Очистити</button> : null}
-          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Порядок карток: тактичні → оперативні → стратегічні; робота → сім’я → особисте.</p>
+          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Перетягніть картку до іншої колонки, щоб змінити її стан. Порядок: тактичні → оперативні → стратегічні; робота → сім’я → особисте.</p>
         </div>
 
         {filtersOpen ? (
@@ -110,28 +230,14 @@ export function TaskKanbanBoard({ tasks, testMode }: TaskKanbanBoardProps) {
         ) : null}
       </section>
 
+      {error ? <p className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm leading-6 text-red-800" role="alert">{error}</p> : null}
+
       {visibleTasks.length === 0 ? (
         <section className="mt-6 max-w-2xl rounded-3xl border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center">
           <h2 className="text-lg font-semibold text-stone-900">{filtersApplied ? "За обраними фільтрами задач немає." : "Задач поки немає."}</h2>
           {filtersApplied ? <button className="mt-5 min-h-11 rounded-full bg-amber-800 px-5 text-sm font-semibold text-white hover:bg-amber-900" onClick={clearFilters} type="button">Показати всі задачі</button> : <Link className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-amber-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-900" href="/tasks/add">Створити задачу</Link>}
         </section>
-      ) : (
-        <>
-          <div className="mt-6 space-y-5 lg:hidden">
-            {columns.map((status) => {
-              const columnTasks = visibleTasks.filter((task) => task.status === status);
-              return <section className={"rounded-2xl border p-3 " + columnStyle(status)} key={status}><div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-stone-950">{taskStatusLabels[status]}</h2><span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-stone-700">{columnTasks.length}</span></div><div className="mt-3 space-y-3">{columnTasks.length > 0 ? columnTasks.map((task) => <div key={task.id}>{taskCard(task, testMode)}</div>) : <p className="rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Немає задач.</p>}</div></section>;
-            })}
-          </div>
-
-          <div className="mt-6 hidden lg:grid lg:grid-cols-6 lg:gap-3">
-              {columns.map((status) => {
-                const columnTasks = visibleTasks.filter((task) => task.status === status);
-                return <section className={"min-w-0 rounded-2xl border p-3 " + columnStyle(status)} key={status}><div className="flex items-center justify-between gap-2"><h2 className="min-w-0 text-sm font-semibold leading-5 text-stone-950">{taskStatusLabels[status]}</h2><span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-stone-700">{columnTasks.length}</span></div><div className="mt-3 space-y-3">{columnTasks.length > 0 ? columnTasks.map((task) => <div key={task.id}>{taskCard(task, testMode)}</div>) : <p className="rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Немає задач.</p>}</div></section>;
-              })}
-          </div>
-        </>
-      )}
+      ) : <><div className="mt-6 space-y-5 lg:hidden">{columns.map(renderColumn)}</div><div className="mt-6 hidden lg:grid lg:grid-cols-6 lg:gap-3">{columns.map(renderColumn)}</div></>}
     </>
   );
 }
