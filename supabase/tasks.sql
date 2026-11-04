@@ -14,7 +14,7 @@ create table if not exists public.tasks (
   area text not null check (area in ('work', 'family', 'personal')),
   horizon text not null check (horizon in ('strategic', 'operational', 'tactical')),
   due_date date,
-  status text not null default 'active' check (status in ('active', 'in_progress', 'completed', 'rejected', 'postponed')),
+  status text not null default 'active' check (status in ('active', 'in_work', 'in_progress', 'completed', 'rejected', 'postponed')),
   postponed_until date,
   completed_by text check (completed_by is null or char_length(btrim(completed_by)) between 2 and 80),
   completed_at timestamptz,
@@ -23,6 +23,7 @@ create table if not exists public.tasks (
   created_at timestamptz not null default now(),
   constraint tasks_status_metadata_matches check (
     (status = 'active' and postponed_until is null and completed_by is null and completed_at is null and rejected_by is null and rejected_at is null)
+    or (status = 'in_work' and postponed_until is null and completed_by is null and completed_at is null and rejected_by is null and rejected_at is null)
     or (status = 'in_progress' and postponed_until is null and completed_by is null and completed_at is null and rejected_by is null and rejected_at is null)
     or (status = 'postponed' and postponed_until is not null and completed_by is null and completed_at is null and rejected_by is null and rejected_at is null)
     or (status = 'completed' and postponed_until is null and completed_by is not null and completed_at is not null and rejected_by is null and rejected_at is null)

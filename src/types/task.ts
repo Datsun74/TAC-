@@ -1,6 +1,6 @@
 export const taskAreas = ["work", "family", "personal"] as const;
 export const taskHorizons = ["strategic", "operational", "tactical"] as const;
-export const taskStatuses = ["active", "in_progress", "completed", "rejected", "postponed"] as const;
+export const taskStatuses = ["active", "in_work", "in_progress", "completed", "rejected", "postponed"] as const;
 
 export type TaskArea = (typeof taskAreas)[number];
 export type TaskHorizon = (typeof taskHorizons)[number];

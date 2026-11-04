@@ -26,6 +26,7 @@ export const taskHorizonLabels: Record<TaskHorizon, string> = {
 
 export const taskStatusLabels: Record<TaskStatus, string> = {
   active: "Активна",
+  in_work: "Взята в роботу",
   in_progress: "У процесі",
   completed: "Виконана",
   rejected: "Відхилена",

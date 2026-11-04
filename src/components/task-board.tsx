@@ -5,9 +5,9 @@ import { Fragment, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 import { readLocalTestTasks, writeLocalTestTasks } from "@/lib/local-test-tasks";
-import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
+import { formatTaskDate, taskAreaLabels, taskAreaOptions, taskHorizonLabels, taskHorizonOptions, taskStatusLabels } from "@/lib/task-options";
 import { createClient } from "@/lib/supabase/client";
-import type { Task, TaskArea } from "@/types/task";
+import type { Task, TaskArea, TaskHorizon, TaskStatus } from "@/types/task";
 
 type TaskBoardProps = Readonly<{
   tasks: readonly Task[];
@@ -16,7 +16,11 @@ type TaskBoardProps = Readonly<{
   view: "today" | "list" | "history";
 }>;
 
-type UpdateKind = "active" | "in_progress" | "completed" | "rejected" | "postponed";
+type UpdateKind = TaskStatus;
+
+const taskControlClass = "inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border px-3 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60";
+const horizonOrder: Record<TaskHorizon, number> = { tactical: 0, operational: 1, strategic: 2 };
+const areaOrder: Record<TaskArea, number> = { work: 0, family: 1, personal: 2 };
 
 function subscribeToLocalTasks() {
   return () => {};
@@ -39,66 +43,26 @@ function oneMonthFromNow() {
   return date.getFullYear() + "-" + month + "-" + day;
 }
 
+function toggleChoice<T extends string>(current: readonly T[], choice: T) {
+  return current.includes(choice) ? current.filter((item) => item !== choice) : [...current, choice];
+}
+
 function nextTask(task: Task, kind: UpdateKind, memberName: string, postponedUntil?: string): Task {
   const changedAt = new Date().toISOString();
 
   if (kind === "completed") {
-    return {
-      ...task,
-      status: "completed",
-      postponedUntil: null,
-      completedBy: memberName,
-      completedAt: changedAt,
-      rejectedBy: null,
-      rejectedAt: null,
-    };
+    return { ...task, status: "completed", postponedUntil: null, completedBy: memberName, completedAt: changedAt, rejectedBy: null, rejectedAt: null };
   }
 
   if (kind === "rejected") {
-    return {
-      ...task,
-      status: "rejected",
-      postponedUntil: null,
-      completedBy: null,
-      completedAt: null,
-      rejectedBy: memberName,
-      rejectedAt: changedAt,
-    };
+    return { ...task, status: "rejected", postponedUntil: null, completedBy: null, completedAt: null, rejectedBy: memberName, rejectedAt: changedAt };
   }
 
   if (kind === "postponed") {
-    return {
-      ...task,
-      status: "postponed",
-      postponedUntil: postponedUntil || oneMonthFromNow(),
-      completedBy: null,
-      completedAt: null,
-      rejectedBy: null,
-      rejectedAt: null,
-    };
+    return { ...task, status: "postponed", postponedUntil: postponedUntil || oneMonthFromNow(), completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null };
   }
 
-  if (kind === "in_progress") {
-    return {
-      ...task,
-      status: "in_progress",
-      postponedUntil: null,
-      completedBy: null,
-      completedAt: null,
-      rejectedBy: null,
-      rejectedAt: null,
-    };
-  }
-
-  return {
-    ...task,
-    status: "active",
-    postponedUntil: null,
-    completedBy: null,
-    completedAt: null,
-    rejectedBy: null,
-    rejectedAt: null,
-  };
+  return { ...task, status: kind, postponedUntil: null, completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null };
 }
 
 function taskUpdate(task: Task) {
@@ -113,33 +77,18 @@ function taskUpdate(task: Task) {
 }
 
 function isInCurrentView(task: Task, view: TaskBoardProps["view"]) {
-  if (view === "history") {
-    return task.status === "completed" || task.status === "rejected";
-  }
+  if (view === "history") return task.status === "completed" || task.status === "rejected";
+  if (view === "list") return task.status === "active" || task.status === "in_work" || task.status === "in_progress" || task.status === "postponed";
+  if (task.status === "postponed") return task.postponedUntil !== null && task.postponedUntil <= currentDate();
 
-  if (view === "list") {
-    return task.status === "active" || task.status === "in_progress" || task.status === "postponed";
-  }
-
-  if (task.status === "postponed") {
-    return task.postponedUntil !== null && task.postponedUntil <= currentDate();
-  }
-
-  // A task without a date is still part of today's review. Otherwise it is
-  // too easy to create an important task and lose it from view immediately.
-  return (task.status === "active" || task.status === "in_progress")
+  return (task.status === "active" || task.status === "in_work" || task.status === "in_progress")
     && (task.dueDate === null || task.dueDate <= currentDate());
 }
 
-function emptyMessage(view: TaskBoardProps["view"]) {
-  if (view === "today") {
-    return "На сьогодні активних задач немає.";
-  }
-
-  if (view === "history") {
-    return "Тут з’являться виконані та відхилені задачі.";
-  }
-
+function emptyMessage(view: TaskBoardProps["view"], filtersApplied: boolean) {
+  if (filtersApplied) return "За обраними фільтрами задач немає.";
+  if (view === "today") return "На сьогодні активних задач немає.";
+  if (view === "history") return "Тут з’являться виконані та відхилені задачі.";
   return "Активних, виконуваних або відкладених задач поки немає.";
 }
 
@@ -147,25 +96,98 @@ function participantLabel(task: Task) {
   return Array.from(new Set([task.createdByName, ...task.participants.map((participant) => participant.name)])).join(", ");
 }
 
+function deadlineLabel(task: Task) {
+  if (task.status === "postponed" && task.postponedUntil) return `До ${formatTaskDate(task.postponedUntil)}`;
+  return task.dueDate ? formatTaskDate(task.dueDate) : "Без дати";
+}
+
+function statusClass(status: TaskStatus) {
+  if (status === "completed") return "bg-emerald-100 text-emerald-900";
+  if (status === "rejected") return "bg-red-50 text-red-800";
+  if (status === "postponed") return "bg-amber-100 text-amber-950";
+  if (status === "in_progress") return "bg-sky-100 text-sky-900";
+  if (status === "in_work") return "bg-violet-100 text-violet-900";
+  return "bg-stone-100 text-stone-700";
+}
+
+type TaskActionsProps = Readonly<{
+  task: Task;
+  view: TaskBoardProps["view"];
+  isUpdating: boolean;
+  onUpdate: (task: Task, kind: UpdateKind) => void;
+  onStartPostponing: (task: Task) => void;
+}>;
+
+function TaskActions({ task, view, isUpdating, onUpdate, onStartPostponing }: TaskActionsProps) {
+  if (view === "history") return null;
+
+  const postponeButton = <button className={taskControlClass + " border-stone-300 text-stone-700 hover:bg-stone-50"} disabled={isUpdating} onClick={() => onStartPostponing(task)} type="button">Відкласти</button>;
+  const rejectButton = <button className={taskControlClass + " border-transparent px-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"} disabled={isUpdating} onClick={() => onUpdate(task, "rejected")} type="button">Відхилити</button>;
+
+  if (task.status === "active") {
+    return <><button className={taskControlClass + " border-amber-800 text-amber-900 hover:bg-amber-50"} disabled={isUpdating} onClick={() => onUpdate(task, "in_work")} type="button">Взяти в роботу</button>{postponeButton}{rejectButton}</>;
+  }
+
+  if (task.status === "in_work") {
+    return <><button className={taskControlClass + " border-sky-700 text-sky-800 hover:bg-sky-50"} disabled={isUpdating} onClick={() => onUpdate(task, "in_progress")} type="button">В процесі</button>{postponeButton}<button className={taskControlClass + " border-transparent px-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"} disabled={isUpdating} onClick={() => onUpdate(task, "active")} type="button">У план</button></>;
+  }
+
+  if (task.status === "in_progress") {
+    return <><button className={taskControlClass + " border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800"} disabled={isUpdating} onClick={() => onUpdate(task, "completed")} type="button">Виконано</button>{postponeButton}<button className={taskControlClass + " border-transparent px-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"} disabled={isUpdating} onClick={() => onUpdate(task, "in_work")} type="button">Назад</button></>;
+  }
+
+  return <button className={taskControlClass + " border-amber-800 text-amber-900 hover:bg-amber-50"} disabled={isUpdating} onClick={() => onUpdate(task, "active")} type="button">Активувати</button>;
+}
+
+type PostponeControlsProps = Readonly<{
+  task: Task;
+  date: string;
+  isUpdating: boolean;
+  onChange: (value: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}>;
+
+function PostponeControls({ task, date, isUpdating, onChange, onConfirm, onCancel }: PostponeControlsProps) {
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <div>
+        <label className="block text-sm font-semibold text-amber-950" htmlFor={`postpone-${task.id}`}>Відкласти до дати</label>
+        <input className="mt-2 min-h-11 rounded-xl border border-amber-300 bg-white px-3 text-sm font-semibold text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-200" id={`postpone-${task.id}`} min={currentDate()} onChange={(event) => onChange(event.target.value)} type="date" value={date} />
+      </div>
+      <button className="min-h-11 rounded-full bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating || !date} onClick={onConfirm} type="button">Підтвердити</button>
+      <button className="min-h-11 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-amber-100" disabled={isUpdating} onClick={onCancel} type="button">Скасувати</button>
+    </div>
+  );
+}
+
 export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps) {
   const router = useRouter();
-  const localTasks = useSyncExternalStore(
-    subscribeToLocalTasks,
-    () => (testMode ? readLocalTestTasks() : tasks),
-    () => tasks,
-  );
+  const localTasks = useSyncExternalStore(subscribeToLocalTasks, () => (testMode ? readLocalTestTasks() : tasks), () => tasks);
   const [overriddenItems, setOverriddenItems] = useState<readonly Task[] | null>(null);
-  const [area, setArea] = useState<TaskArea | "all">("all");
+  const [selectedAreas, setSelectedAreas] = useState<readonly TaskArea[]>([]);
+  const [selectedHorizons, setSelectedHorizons] = useState<readonly TaskHorizon[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [postponingTaskId, setPostponingTaskId] = useState<string | null>(null);
   const [postponeDate, setPostponeDate] = useState("");
   const [error, setError] = useState("");
   const items = overriddenItems ?? localTasks;
+  const filtersApplied = selectedAreas.length > 0 || selectedHorizons.length > 0;
 
-  const visibleTasks = useMemo(
-    () => items.filter((task) => isInCurrentView(task, view) && (area === "all" || task.area === area)),
-    [area, items, view],
-  );
+  const visibleTasks = useMemo(() => {
+    return items
+      .filter((task) => isInCurrentView(task, view))
+      .filter((task) => selectedAreas.length === 0 || selectedAreas.includes(task.area))
+      .filter((task) => selectedHorizons.length === 0 || selectedHorizons.includes(task.horizon))
+      .sort((left, right) => {
+        const horizonDifference = horizonOrder[left.horizon] - horizonOrder[right.horizon];
+        if (horizonDifference !== 0) return horizonDifference;
+        const areaDifference = areaOrder[left.area] - areaOrder[right.area];
+        if (areaDifference !== 0) return areaDifference;
+        return (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31") || left.createdAt.localeCompare(right.createdAt);
+      });
+  }, [items, selectedAreas, selectedHorizons, view]);
 
   async function updateStatus(task: Task, kind: UpdateKind, postponedUntil?: string) {
     const updatedTask = nextTask(task, kind, memberName, postponedUntil);
@@ -184,15 +206,13 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
     }
 
     const { error: updateError } = await createClient().from("tasks").update(taskUpdate(updatedTask)).eq("id", task.id);
-
     if (updateError) {
       setOverriddenItems(previousItems);
-      setError("Не вдалося оновити задачу. Спробуйте ще раз.");
+      setError("Не вдалося оновити задачу. Якщо новий стан «Взята в роботу» не зберігається, виконайте tasks-status-in-work.sql у Supabase.");
     } else {
       if (kind === "postponed") setPostponingTaskId(null);
       router.refresh();
     }
-
     setIsUpdating(null);
   }
 
@@ -201,101 +221,74 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
     setPostponeDate(task.postponedUntil ?? oneMonthFromNow());
   }
 
+  function taskTitle(task: Task) {
+    return testMode ? task.title : <Link className="hover:text-amber-800 hover:underline" href={`/tasks/${task.id}`}>{task.title}</Link>;
+  }
+
   return (
     <>
-      <div className="mt-8 flex flex-wrap gap-2" aria-label="Фільтр за напрямом">
-        <button className={"min-h-10 rounded-full px-4 text-sm font-semibold transition-colors " + (area === "all" ? "bg-amber-800 text-white" : "bg-stone-100 text-stone-700 hover:bg-stone-200")} onClick={() => setArea("all")} type="button">
-          Усі
-        </button>
-        {(Object.keys(taskAreaLabels) as TaskArea[]).map((value) => (
-          <button className={"min-h-10 rounded-full px-4 text-sm font-semibold transition-colors " + (area === value ? "bg-amber-800 text-white" : "bg-stone-100 text-stone-700 hover:bg-stone-200")} key={value} onClick={() => setArea(value)} type="button">
-            {taskAreaLabels[value]}
-          </button>
-        ))}
-      </div>
+      <section className="mt-8 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm" aria-label="Керування списком задач">
+        <div className="flex flex-wrap items-center gap-2">
+          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length})` : ""}</button>
+          {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSelectedAreas([]); setSelectedHorizons([]); }} type="button">Очистити</button> : null}
+          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Порядок: тактичні → оперативні → стратегічні; у кожній групі: робота → сім’я → особисте.</p>
+        </div>
 
-      {error ? <p className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{error}</p> : null}
+        {filtersOpen ? (
+          <div className="mt-4 grid gap-5 border-t border-stone-100 pt-4 sm:grid-cols-2">
+            <fieldset>
+              <legend className="text-sm font-semibold text-stone-950">Рівень планування</legend>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Позначте один або кілька рівнів. Без позначок — усі.</p>
+              <div className="mt-3 space-y-2">
+                {taskHorizonOptions.map((option) => <label className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={option.value}><input checked={selectedHorizons.includes(option.value)} className="size-4 accent-amber-800" onChange={() => setSelectedHorizons((current) => toggleChoice(current, option.value))} type="checkbox" /><span>{option.label} <span className="text-stone-500">— {option.hint}</span></span></label>)}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-sm font-semibold text-stone-950">Напрям</legend>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Можна поєднати, наприклад, лише «Сім’я» з двома рівнями планування.</p>
+              <div className="mt-3 space-y-2">
+                {taskAreaOptions.map((option) => <label className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={option.value}><input checked={selectedAreas.includes(option.value)} className="size-4 accent-amber-800" onChange={() => setSelectedAreas((current) => toggleChoice(current, option.value))} type="checkbox" /><span>{option.label}</span></label>)}
+              </div>
+            </fieldset>
+          </div>
+        ) : null}
+      </section>
+
+      {error ? <p className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm leading-6 text-red-800" role="alert">{error}</p> : null}
 
       {visibleTasks.length === 0 ? (
         <section className="mt-6 max-w-2xl rounded-3xl border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center">
-          <h2 className="text-lg font-semibold text-stone-900">{emptyMessage(view)}</h2>
+          <h2 className="text-lg font-semibold text-stone-900">{emptyMessage(view, filtersApplied)}</h2>
           {view !== "history" ? <Link className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-amber-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-900" href="/tasks/add">Створити задачу</Link> : null}
         </section>
       ) : (
-        <div className="mt-6 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-[76rem] w-full border-collapse text-left text-sm">
-              <caption className="sr-only">Список задач</caption>
-              <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-600">
-                <tr>
-                  <th className="min-w-72 px-5 py-3 font-semibold" scope="col">Задача</th>
-                  <th className="px-4 py-3 font-semibold" scope="col">Напрям</th>
-                  <th className="px-4 py-3 font-semibold" scope="col">Планування</th>
-                  <th className="min-w-44 px-4 py-3 font-semibold" scope="col">Учасники</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold" scope="col">Строк</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold" scope="col">Стан</th>
-                  <th className="px-4 py-3 font-semibold"><span className="sr-only">Дії</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleTasks.map((task) => (
-                  <Fragment key={task.id}>
-                    <tr className="border-t border-stone-100 align-top transition-colors hover:bg-stone-50/80">
-                      <th className="px-5 py-4 font-semibold text-stone-950" scope="row">
-                        {testMode ? task.title : <Link className="hover:text-amber-800 hover:underline" href={`/tasks/${task.id}`}>{task.title}</Link>}
-                        {task.goal ? <p className="mt-1 max-w-xl font-normal leading-5 text-stone-600">{task.goal}</p> : null}
-                        <p className="mt-2 text-xs font-normal text-stone-500">{task.scopeName}</p>
-                      </th>
-                      <td className="whitespace-nowrap px-4 py-4 text-stone-800">{taskAreaLabels[task.area]}</td>
-                      <td className="whitespace-nowrap px-4 py-4 text-stone-800">{taskHorizonLabels[task.horizon]}</td>
-                      <td className="px-4 py-4 leading-5 text-stone-800">{participantLabel(task)}</td>
-                      <td className="whitespace-nowrap px-4 py-4 text-stone-800">
-                        {task.status === "postponed" && task.postponedUntil ? `До ${formatTaskDate(task.postponedUntil)}` : task.dueDate ? formatTaskDate(task.dueDate) : "Без дати"}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-4"><span className={"rounded-full px-2.5 py-1 text-xs font-semibold " + (task.status === "completed" ? "bg-emerald-100 text-emerald-900" : task.status === "rejected" ? "bg-red-50 text-red-800" : task.status === "postponed" ? "bg-amber-100 text-amber-950" : task.status === "in_progress" ? "bg-sky-100 text-sky-900" : "bg-stone-100 text-stone-700")}>{taskStatusLabels[task.status]}</span></td>
-                      <td className="px-4 py-3">
-                        {view !== "history" ? (
-                          <div className="flex min-w-max flex-wrap gap-2">
-                            {task.status === "active" ? (
-                              <>
-                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-amber-800 px-3 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "in_progress")} type="button">В роботу</button>
-                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full bg-emerald-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "completed")} type="button">Виконано</button>
-                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => startPostponing(task)} type="button">Відкласти</button>
-                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full px-2 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "rejected")} type="button">Відхилити</button>
-                              </>
-                            ) : task.status === "in_progress" ? (
-                              <>
-                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full bg-emerald-700 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "completed")} type="button">Виконано</button>
-                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => startPostponing(task)} type="button">Відкласти</button>
-                                <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full px-2 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "active")} type="button">У план</button>
-                              </>
-                            ) : (
-                              <button className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-amber-800 px-3 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "active")} type="button">Активувати</button>
-                            )}
-                          </div>
-                        ) : null}
-                      </td>
-                    </tr>
-                    {postponingTaskId === task.id ? (
-                      <tr className="border-t border-amber-100 bg-amber-50">
-                        <td className="px-5 py-4" colSpan={7}>
-                          <div className="flex flex-wrap items-end gap-3">
-                            <div>
-                              <label className="block text-sm font-semibold text-amber-950" htmlFor={`postpone-${task.id}`}>Відкласти до дати</label>
-                              <input className="mt-2 min-h-11 rounded-xl border border-amber-300 bg-white px-3 text-sm font-semibold text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-200" id={`postpone-${task.id}`} min={currentDate()} onChange={(event) => setPostponeDate(event.target.value)} type="date" value={postponeDate} />
-                            </div>
-                            <button className="min-h-11 rounded-full bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id || !postponeDate} onClick={() => void updateStatus(task, "postponed", postponeDate)} type="button">Підтвердити</button>
-                            <button className="min-h-11 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-amber-100" disabled={isUpdating === task.id} onClick={() => setPostponingTaskId(null)} type="button">Скасувати</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
+        <>
+          <div className="mt-6 space-y-3 xl:hidden">
+            {visibleTasks.map((task) => (
+              <article className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm" key={task.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><h2 className="font-semibold text-stone-950">{taskTitle(task)}</h2>{task.goal ? <p className="mt-1 text-sm leading-5 text-stone-600">{task.goal}</p> : null}</div>
+                  <span className={"shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span>
+                </div>
+                <div className="mt-3 grid gap-1 text-sm leading-5 text-stone-700"><p><span className="font-medium text-stone-950">{taskHorizonLabels[task.horizon]}</span> · {taskAreaLabels[task.area]}</p><p>Строк: {deadlineLabel(task)}</p><p className="text-stone-600">Учасники: {participantLabel(task)}</p></div>
+                <div className="mt-4 flex flex-wrap gap-2"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div>
+                {postponingTaskId === task.id ? <div className="mt-4 border-t border-amber-100 pt-4"><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></div> : null}
+              </article>
+            ))}
           </div>
-        </div>
+
+          <div className="mt-6 hidden overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm xl:block">
+            <div className="overflow-x-auto">
+              <table className="min-w-[70rem] w-full border-collapse text-left text-sm">
+                <caption className="sr-only">Список задач</caption>
+                <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-600"><tr><th className="min-w-72 px-5 py-3 font-semibold" scope="col">Задача</th><th className="px-4 py-3 font-semibold" scope="col">Напрям</th><th className="px-4 py-3 font-semibold" scope="col">Планування</th><th className="min-w-44 px-4 py-3 font-semibold" scope="col">Учасники</th><th className="whitespace-nowrap px-4 py-3 font-semibold" scope="col">Строк</th><th className="whitespace-nowrap px-4 py-3 font-semibold" scope="col">Стан</th><th className="px-4 py-3 font-semibold"><span className="sr-only">Дії</span></th></tr></thead>
+                <tbody>
+                  {visibleTasks.map((task) => <Fragment key={task.id}><tr className="border-t border-stone-100 align-top transition-colors hover:bg-stone-50/80"><th className="px-5 py-4 font-semibold text-stone-950" scope="row">{taskTitle(task)}{task.goal ? <p className="mt-1 max-w-xl font-normal leading-5 text-stone-600">{task.goal}</p> : null}<p className="mt-2 text-xs font-normal text-stone-500">{task.scopeName}</p></th><td className="whitespace-nowrap px-4 py-4 text-stone-800">{taskAreaLabels[task.area]}</td><td className="whitespace-nowrap px-4 py-4 text-stone-800">{taskHorizonLabels[task.horizon]}</td><td className="px-4 py-4 leading-5 text-stone-800">{participantLabel(task)}</td><td className="whitespace-nowrap px-4 py-4 text-stone-800">{deadlineLabel(task)}</td><td className="whitespace-nowrap px-4 py-4"><span className={"rounded-full px-2.5 py-1 text-xs font-semibold " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span></td><td className="px-4 py-3"><div className="flex min-w-max flex-wrap gap-2"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div></td></tr>{postponingTaskId === task.id ? <tr className="border-t border-amber-100 bg-amber-50"><td className="px-5 py-4" colSpan={7}><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></td></tr> : null}</Fragment>)}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </>
   );
