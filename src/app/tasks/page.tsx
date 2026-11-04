@@ -8,7 +8,7 @@ import { getTasks } from "@/lib/tasks";
 export default async function TasksTodayPage() {
   const testMode = isLocalTestMode();
   const member = await getTaskUserContext();
-  const result = testMode ? null : await getTasks(["active", "in_progress"]);
+  const result = testMode ? null : await getTasks(["active", "in_progress", "postponed"]);
 
   return (
     <section className="w-full py-10 sm:py-14 lg:py-16">

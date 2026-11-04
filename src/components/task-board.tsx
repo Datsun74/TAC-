@@ -121,7 +121,14 @@ function isInCurrentView(task: Task, view: TaskBoardProps["view"]) {
     return task.status === "active" || task.status === "in_progress" || task.status === "postponed";
   }
 
-  return (task.status === "active" || task.status === "in_progress") && task.dueDate !== null && task.dueDate <= currentDate();
+  if (task.status === "postponed") {
+    return task.postponedUntil !== null && task.postponedUntil <= currentDate();
+  }
+
+  // A task without a date is still part of today's review. Otherwise it is
+  // too easy to create an important task and lose it from view immediately.
+  return (task.status === "active" || task.status === "in_progress")
+    && (task.dueDate === null || task.dueDate <= currentDate());
 }
 
 function emptyMessage(view: TaskBoardProps["view"]) {
