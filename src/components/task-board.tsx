@@ -39,7 +39,7 @@ function oneMonthFromNow() {
   return date.getFullYear() + "-" + month + "-" + day;
 }
 
-function nextTask(task: Task, kind: UpdateKind, memberName: string): Task {
+function nextTask(task: Task, kind: UpdateKind, memberName: string, postponedUntil?: string): Task {
   const changedAt = new Date().toISOString();
 
   if (kind === "completed") {
@@ -70,7 +70,7 @@ function nextTask(task: Task, kind: UpdateKind, memberName: string): Task {
     return {
       ...task,
       status: "postponed",
-      postponedUntil: oneMonthFromNow(),
+      postponedUntil: postponedUntil || oneMonthFromNow(),
       completedBy: null,
       completedAt: null,
       rejectedBy: null,
@@ -146,6 +146,8 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
   const [overriddenItems, setOverriddenItems] = useState<readonly Task[] | null>(null);
   const [area, setArea] = useState<TaskArea | "all">("all");
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [postponingTaskId, setPostponingTaskId] = useState<string | null>(null);
+  const [postponeDate, setPostponeDate] = useState("");
   const [error, setError] = useState("");
   const items = overriddenItems ?? localTasks;
 
@@ -154,8 +156,8 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
     [area, items, view],
   );
 
-  async function updateStatus(task: Task, kind: UpdateKind) {
-    const updatedTask = nextTask(task, kind, memberName);
+  async function updateStatus(task: Task, kind: UpdateKind, postponedUntil?: string) {
+    const updatedTask = nextTask(task, kind, memberName, postponedUntil);
     const previousItems = items;
     const updatedItems = items.map((item) => (item.id === task.id ? updatedTask : item));
 
@@ -165,6 +167,7 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
 
     if (testMode) {
       writeLocalTestTasks(updatedItems);
+      if (kind === "postponed") setPostponingTaskId(null);
       setIsUpdating(null);
       return;
     }
@@ -175,10 +178,16 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
       setOverriddenItems(previousItems);
       setError("Не вдалося оновити задачу. Спробуйте ще раз.");
     } else {
+      if (kind === "postponed") setPostponingTaskId(null);
       router.refresh();
     }
 
     setIsUpdating(null);
+  }
+
+  function startPostponing(task: Task) {
+    setPostponingTaskId(task.id);
+    setPostponeDate(task.postponedUntil ?? oneMonthFromNow());
   }
 
   return (
@@ -244,18 +253,30 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
                     <>
                       <button className="min-h-10 rounded-full bg-amber-800 px-4 text-sm font-semibold text-white transition-colors hover:bg-amber-900 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "in_progress")} type="button">Взяти в роботу</button>
                       <button className="min-h-10 rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "completed")} type="button">Виконано</button>
-                      <button className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "postponed")} type="button">На місяць</button>
+                      <button className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => startPostponing(task)} type="button">Відкласти</button>
                       <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "rejected")} type="button">Відхилити</button>
                     </>
                   ) : task.status === "in_progress" ? (
                     <>
                       <button className="min-h-10 rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "completed")} type="button">Виконано</button>
-                      <button className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "postponed")} type="button">На місяць</button>
+                      <button className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => startPostponing(task)} type="button">Відкласти</button>
                       <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "active")} type="button">Повернути в план</button>
                     </>
                   ) : (
                     <button className="min-h-10 rounded-full border border-amber-800 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id} onClick={() => void updateStatus(task, "active")} type="button">Повернути в активні</button>
                   )}
+                </div>
+              ) : null}
+
+              {postponingTaskId === task.id ? (
+                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <label className="block text-sm font-semibold text-amber-950" htmlFor={`postpone-${task.id}`}>Відкласти до дати</label>
+                  <p className="mt-1 text-sm text-amber-900">Задача зникне з активного списку, але залишиться у плані та повернеться до роботи у вибраний день.</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <input className="min-h-11 rounded-xl border border-amber-300 bg-white px-3 text-sm font-semibold text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-200" id={`postpone-${task.id}`} min={currentDate()} onChange={(event) => setPostponeDate(event.target.value)} type="date" value={postponeDate} />
+                    <button className="min-h-11 rounded-full bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900 disabled:cursor-wait disabled:opacity-60" disabled={isUpdating === task.id || !postponeDate} onClick={() => void updateStatus(task, "postponed", postponeDate)} type="button">Підтвердити</button>
+                    <button className="min-h-11 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-amber-100" disabled={isUpdating === task.id} onClick={() => setPostponingTaskId(null)} type="button">Скасувати</button>
+                  </div>
                 </div>
               ) : null}
             </article>
