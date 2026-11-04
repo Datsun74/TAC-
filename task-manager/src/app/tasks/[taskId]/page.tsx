@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { TaskChecklist } from "@/components/task-checklist";
+import { TaskEditor } from "@/components/task-editor";
 import { getTaskUserContext } from "@/lib/task-access";
 import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
 import { isLocalTestMode } from "@/lib/test-mode";
@@ -56,6 +57,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           <div><dt className="text-stone-500">Строк</dt><dd className="mt-1 font-semibold text-stone-800">{task.dueDate ? formatTaskDate(task.dueDate) : "Не встановлено"}</dd></div>
           <div className="sm:col-span-2"><dt className="text-stone-500">Учасники</dt><dd className="mt-1 font-semibold text-stone-800">{task.participants.length > 0 ? task.participants.map((participant) => participant.name).join(", ") : "Особиста задача"}</dd></div>
         </dl>
+        <TaskEditor task={task} />
       </div>
       <TaskChecklist
         currentUserId={member.userId}
