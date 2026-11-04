@@ -16,6 +16,7 @@ type TaskShellProps = Readonly<{
 const navigation = [
   { href: "/tasks", label: "Сьогодні", mobileLabel: "Сьогодні", symbol: "⌂" },
   { href: "/tasks/list", label: "Усі задачі", mobileLabel: "Усі", symbol: "≡" },
+  { href: "/tasks/board", label: "Дошка", mobileLabel: "Дошка", symbol: "▦" },
   { href: "/tasks/add", label: "Нова задача", mobileLabel: "Додати", symbol: "+" },
   { href: "/tasks/history", label: "Історія", mobileLabel: "Історія", symbol: "✓" },
   { href: "/tasks/workspaces", label: "Простори", mobileLabel: "Простори", symbol: "◌" },
@@ -80,7 +81,7 @@ export function TaskShell({ children, displayName, spaceName, testMode }: TaskSh
 
       {signOutError ? <p aria-live="assertive" className="fixed right-4 bottom-24 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-lg lg:bottom-4">{signOutError}</p> : null}
       <nav aria-label="Навігація на телефоні" className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/95 px-1 py-2 shadow-[0_-8px_24px_rgba(28,25,23,0.08)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-6 gap-1">
           {navigation.map((item) => {
             const isCurrent = pathname === item.href;
             return (
