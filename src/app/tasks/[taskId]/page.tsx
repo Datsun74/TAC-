@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { TaskAttachments } from "@/components/task-attachments";
 import { TaskChecklist } from "@/components/task-checklist";
 import { TaskComments } from "@/components/task-comments";
+import { TaskDetailStatus } from "@/components/task-detail-status";
 import { getTaskUserContext } from "@/lib/task-access";
 import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
 import { isLocalTestMode } from "@/lib/test-mode";
@@ -82,6 +83,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           </ol>
           {result.activityError ? <p className="mt-4 rounded-xl bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">{result.activityError}</p> : null}
         </section>
+        <TaskDetailStatus memberName={member.displayName} postponedUntil={task.postponedUntil} status={task.status} taskId={task.id} />
       </div>
 
       <TaskChecklist
