@@ -114,6 +114,16 @@ function containerLabel(task: Task) {
   return task.projectName ? `Проєкт: ${task.projectName}` : `Простір: ${task.scopeName}`;
 }
 
+function escapeWordHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/\r?\n/g, "<br>");
+}
+
 function taskMatchesSearch(task: Task, search: string) {
   const query = search.trim().toLocaleLowerCase("uk-UA");
   if (!query) return true;
@@ -277,6 +287,29 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
     return testMode ? task.title : <Link className="hover:text-amber-800 hover:underline" href={`/tasks/${task.id}`}>{task.title}</Link>;
   }
 
+  function exportWordReport() {
+    const exportedAt = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
+    const description = filtersApplied ? "Звіт сформовано за вибраними пошуком і фільтрами." : "Звіт без додаткових фільтрів.";
+    const rows = visibleTasks.map((task) => {
+      const taskDetails = task.goal
+        ? `<strong>${escapeWordHtml(task.title)}</strong><br><span class="comment">${escapeWordHtml(task.goal)}</span><br><span class="meta">${escapeWordHtml(taskAreaLabels[task.area])} · Строк: ${escapeWordHtml(deadlineLabel(task))}</span>`
+        : `<strong>${escapeWordHtml(task.title)}</strong><br><span class="meta">${escapeWordHtml(taskAreaLabels[task.area])} · Строк: ${escapeWordHtml(deadlineLabel(task))}</span>`;
+
+      return `<tr><td>${escapeWordHtml(task.createdByName)}</td><td>${escapeWordHtml(taskHorizonLabels[task.horizon])}</td><td>${escapeWordHtml(containerLabel(task))}</td><td>${escapeWordHtml(participantLabel(task))}</td><td>${taskDetails}</td><td>${escapeWordHtml(taskStatusLabels[task.status])}</td></tr>`;
+    }).join("");
+    const emptyRow = "<tr><td colspan=\"6\">За обраними умовами задач немає.</td></tr>";
+    const wordDocument = `<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8"><title>${escapeWordHtml(reportTitle(view))}</title><style>body{font-family:Arial,sans-serif;color:#292524;font-size:10pt}h1{font-size:20pt;margin:0 0 6pt}p{margin:0 0 12pt;color:#57534e}table{border-collapse:collapse;width:100%;table-layout:fixed}th{background:#f5f5f4;text-align:left;font-size:8pt;text-transform:uppercase;color:#57534e}th,td{border:1px solid #d6d3d1;padding:6pt;vertical-align:top;word-wrap:break-word}.comment{color:#57534e}.meta{font-size:8pt;color:#78716c}</style></head><body><h1>Задачник — ${escapeWordHtml(reportTitle(view))}</h1><p>${escapeWordHtml(description)} Дата формування: ${escapeWordHtml(exportedAt)}. Усього задач: ${visibleTasks.length}.</p><table><thead><tr><th>Автор</th><th>Планування</th><th>Простір / проєкт</th><th>Виконавець</th><th>Назва / суть і коментар</th><th>Статус</th></tr></thead><tbody>${rows || emptyRow}</tbody></table></body></html>`;
+    const blob = new Blob(["\ufeff", wordDocument], { type: "application/msword;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = `zadachnyk-zvit-${currentDate()}.doc`;
+    document.body.append(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
+
   return (
     <>
       <section className="task-print-heading">
@@ -290,6 +323,7 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
           <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedAuthors.length + selectedExecutors.length + selectedContainers.length + (search.trim() ? 1 : 0)})` : ""}</button>
           {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSearch(""); setSelectedAreas([]); setSelectedHorizons([]); setSelectedAuthors([]); setSelectedExecutors([]); setSelectedContainers([]); }} type="button">Очистити</button> : null}
           <button className="min-h-10 rounded-full border border-amber-800 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50" onClick={() => window.print()} type="button">Друк / PDF</button>
+          <button className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={exportWordReport} type="button">Завантажити Word</button>
           <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Порядок звіту: автор → стратегічні / оперативні / тактичні → простір або проєкт → виконавець → задача → статус.</p>
         </div>
 
