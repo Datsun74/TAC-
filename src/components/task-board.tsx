@@ -19,7 +19,6 @@ type TaskBoardProps = Readonly<{
 
 type UpdateKind = TaskStatus;
 
-const taskControlClass = "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold leading-4 transition-colors disabled:cursor-wait disabled:opacity-60";
 const horizonOrder: Record<TaskHorizon, number> = { strategic: 0, operational: 1, tactical: 2 };
 
 type ReportRow = Readonly<{
@@ -157,22 +156,35 @@ type TaskActionsProps = Readonly<{
 function TaskActions({ task, view, isUpdating, onUpdate, onStartPostponing }: TaskActionsProps) {
   if (view === "history") return null;
 
-  const postponeButton = <button className={taskControlClass + " border-stone-300 text-stone-700 hover:bg-stone-50"} disabled={isUpdating} onClick={() => onStartPostponing(task)} type="button">Відкласти</button>;
-  const rejectButton = <button className={taskControlClass + " border-transparent px-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"} disabled={isUpdating} onClick={() => onUpdate(task, "rejected")} type="button">Відхилити</button>;
+  const options = task.status === "active"
+    ? [{ value: "in_work", label: "Взяти в роботу" }, { value: "postponed", label: "Відкласти до дати" }, { value: "rejected", label: "Відхилити" }]
+    : task.status === "in_work"
+      ? [{ value: "in_progress", label: "Перевести у процес" }, { value: "active", label: "Повернути у план" }, { value: "postponed", label: "Відкласти до дати" }, { value: "rejected", label: "Відхилити" }]
+      : task.status === "in_progress"
+        ? [{ value: "completed", label: "Позначити виконаною" }, { value: "in_work", label: "Повернути у роботу" }, { value: "postponed", label: "Відкласти до дати" }, { value: "rejected", label: "Відхилити" }]
+        : [{ value: "active", label: "Активувати" }, { value: "rejected", label: "Відхилити" }];
 
-  if (task.status === "active") {
-    return <><button className={taskControlClass + " border-amber-800 text-amber-900 hover:bg-amber-50"} disabled={isUpdating} onClick={() => onUpdate(task, "in_work")} type="button">У роботу</button>{postponeButton}{rejectButton}</>;
-  }
-
-  if (task.status === "in_work") {
-    return <><button className={taskControlClass + " border-sky-700 text-sky-800 hover:bg-sky-50"} disabled={isUpdating} onClick={() => onUpdate(task, "in_progress")} type="button">В процесі</button>{postponeButton}<button className={taskControlClass + " border-transparent px-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"} disabled={isUpdating} onClick={() => onUpdate(task, "active")} type="button">У план</button></>;
-  }
-
-  if (task.status === "in_progress") {
-    return <><button className={taskControlClass + " border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800"} disabled={isUpdating} onClick={() => onUpdate(task, "completed")} type="button">Виконано</button>{postponeButton}<button className={taskControlClass + " border-transparent px-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"} disabled={isUpdating} onClick={() => onUpdate(task, "in_work")} type="button">Назад</button></>;
-  }
-
-  return <button className={taskControlClass + " border-amber-800 text-amber-900 hover:bg-amber-50"} disabled={isUpdating} onClick={() => onUpdate(task, "active")} type="button">Активувати</button>;
+  return (
+    <select
+      aria-label={`Дія для задачі «${task.title}»`}
+      className="min-h-9 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-2 text-xs font-semibold text-stone-800 outline-none transition focus:border-amber-700 focus:ring-2 focus:ring-amber-100 disabled:cursor-wait disabled:opacity-60"
+      defaultValue=""
+      disabled={isUpdating}
+      onChange={(event) => {
+        const nextStatus = event.target.value as TaskStatus | "";
+        event.target.value = "";
+        if (!nextStatus) return;
+        if (nextStatus === "postponed") {
+          onStartPostponing(task);
+          return;
+        }
+        onUpdate(task, nextStatus);
+      }}
+    >
+      <option disabled value="">Дія…</option>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  );
 }
 
 type PostponeControlsProps = Readonly<{
