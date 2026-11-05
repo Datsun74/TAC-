@@ -55,6 +55,14 @@ function projectOptionsForTasks(tasks: readonly Task[]) {
     .sort((left, right) => left.name.localeCompare(right.name, "uk"));
 }
 
+function taskMatchesSearch(task: Task, search: string) {
+  const query = search.trim().toLocaleLowerCase("uk-UA");
+  if (!query) return true;
+  return [task.title, task.goal, task.scopeName, task.projectName, task.createdByName, ...task.participants.map((participant) => participant.name)]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.toLocaleLowerCase("uk-UA").includes(query));
+}
+
 function columnStyle(status: TaskStatus) {
   if (status === "completed") return "border-emerald-200 bg-emerald-50/60";
   if (status === "rejected") return "border-red-200 bg-red-50/60";
@@ -114,17 +122,19 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
   const [selectedHorizons, setSelectedHorizons] = useState<readonly TaskHorizon[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<readonly string[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<readonly string[]>([]);
+  const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const items = overriddenItems ?? localTasks;
-  const filtersApplied = selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedPeople.length > 0 || selectedProjectIds.length > 0;
+  const filtersApplied = Boolean(search.trim()) || selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedPeople.length > 0 || selectedProjectIds.length > 0;
 
   const people = useMemo(() => Array.from(new Set(items.flatMap(peopleForTask))).sort((left, right) => left.localeCompare(right, "uk")), [items]);
   const projects = useMemo(() => projectOptionsForTasks(items), [items]);
   const visibleTasks = useMemo(() => items
+    .filter((task) => taskMatchesSearch(task, search))
     .filter((task) => selectedAreas.length === 0 || selectedAreas.includes(task.area))
     .filter((task) => selectedHorizons.length === 0 || selectedHorizons.includes(task.horizon))
     .filter((task) => selectedPeople.length === 0 || peopleForTask(task).some((person) => selectedPeople.includes(person)))
@@ -135,9 +145,10 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
       const areaDifference = areaOrder[left.area] - areaOrder[right.area];
       if (areaDifference !== 0) return areaDifference;
       return (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31") || left.createdAt.localeCompare(right.createdAt);
-    }), [items, selectedAreas, selectedHorizons, selectedPeople, selectedProjectIds]);
+    }), [items, search, selectedAreas, selectedHorizons, selectedPeople, selectedProjectIds]);
 
   function clearFilters() {
+    setSearch("");
     setSelectedAreas([]);
     setSelectedHorizons([]);
     setSelectedPeople([]);
@@ -209,7 +220,8 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
     <>
       <section className="mt-8 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm" aria-label="Фільтри Канбан-дошки">
         <div className="flex flex-wrap items-center gap-2">
-          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedPeople.length + selectedProjectIds.length})` : ""}</button>
+          <label className="min-w-[13rem] flex-1 sm:max-w-sm"><span className="sr-only">Пошук задач на канбані</span><input className="min-h-10 w-full rounded-full border border-stone-300 bg-white px-4 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-amber-700 focus:ring-2 focus:ring-amber-100" onChange={(event) => setSearch(event.target.value)} placeholder="Пошук задач, проєктів, людей…" type="search" value={search} /></label>
+          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedPeople.length + selectedProjectIds.length + (search.trim() ? 1 : 0)})` : ""}</button>
           {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={clearFilters} type="button">Очистити</button> : null}
           <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Перетягніть картку до іншої колонки, щоб змінити її стан. Порядок: тактичні → оперативні → стратегічні; робота → сім’я → особисте. Назва проєкту показана під задачею.</p>
         </div>

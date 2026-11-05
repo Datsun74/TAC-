@@ -114,6 +114,14 @@ function containerLabel(task: Task) {
   return task.projectName ? `Проєкт: ${task.projectName}` : `Простір: ${task.scopeName}`;
 }
 
+function taskMatchesSearch(task: Task, search: string) {
+  const query = search.trim().toLocaleLowerCase("uk-UA");
+  if (!query) return true;
+  return [task.title, task.goal, task.scopeName, task.projectName, task.createdByName, ...task.participants.map((participant) => participant.name)]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.toLocaleLowerCase("uk-UA").includes(query));
+}
+
 function deadlineLabel(task: Task) {
   if (task.status === "postponed" && task.postponedUntil) return `До ${formatTaskDate(task.postponedUntil)}`;
   return task.dueDate ? formatTaskDate(task.dueDate) : "Без дати";
@@ -188,13 +196,14 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
   const [selectedAuthors, setSelectedAuthors] = useState<readonly string[]>([]);
   const [selectedExecutors, setSelectedExecutors] = useState<readonly string[]>([]);
   const [selectedContainers, setSelectedContainers] = useState<readonly string[]>([]);
+  const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [postponingTaskId, setPostponingTaskId] = useState<string | null>(null);
   const [postponeDate, setPostponeDate] = useState("");
   const [error, setError] = useState("");
   const items = overriddenItems ?? localTasks;
-  const filtersApplied = selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedAuthors.length > 0 || selectedExecutors.length > 0 || selectedContainers.length > 0;
+  const filtersApplied = Boolean(search.trim()) || selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedAuthors.length > 0 || selectedExecutors.length > 0 || selectedContainers.length > 0;
 
   const authorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map((task) => task.createdByName))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
   const executorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map(participantLabel))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
@@ -204,6 +213,7 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
     return items
       .filter((task) => isInCurrentView(task, view))
       .filter((task) => !projectId || task.projectId === projectId)
+      .filter((task) => taskMatchesSearch(task, search))
       .filter((task) => selectedAreas.length === 0 || selectedAreas.includes(task.area))
       .filter((task) => selectedHorizons.length === 0 || selectedHorizons.includes(task.horizon))
       .filter((task) => selectedAuthors.length === 0 || selectedAuthors.includes(task.createdByName))
@@ -220,7 +230,7 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
         if (executorDifference !== 0) return executorDifference;
         return left.title.localeCompare(right.title, "uk") || (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31");
       });
-  }, [items, projectId, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, view]);
+  }, [items, projectId, search, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, view]);
 
   const reportRows = useMemo<readonly ReportRow[]>(() => visibleTasks.map((task, index) => {
     const previous = visibleTasks[index - 1];
@@ -276,8 +286,9 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
 
       <section className="task-print-control mt-8 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm" aria-label="Керування списком задач">
         <div className="flex flex-wrap items-center gap-2">
-          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedAuthors.length + selectedExecutors.length + selectedContainers.length})` : ""}</button>
-          {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSelectedAreas([]); setSelectedHorizons([]); setSelectedAuthors([]); setSelectedExecutors([]); setSelectedContainers([]); }} type="button">Очистити</button> : null}
+          <label className="min-w-[13rem] flex-1 sm:max-w-sm"><span className="sr-only">Пошук задач</span><input className="min-h-10 w-full rounded-full border border-stone-300 bg-white px-4 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-amber-700 focus:ring-2 focus:ring-amber-100" onChange={(event) => setSearch(event.target.value)} placeholder="Пошук задач, проєктів, людей…" type="search" value={search} /></label>
+          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedAuthors.length + selectedExecutors.length + selectedContainers.length + (search.trim() ? 1 : 0)})` : ""}</button>
+          {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSearch(""); setSelectedAreas([]); setSelectedHorizons([]); setSelectedAuthors([]); setSelectedExecutors([]); setSelectedContainers([]); }} type="button">Очистити</button> : null}
           <button className="min-h-10 rounded-full border border-amber-800 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50" onClick={() => window.print()} type="button">Друк / PDF</button>
           <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Порядок звіту: автор → стратегічні / оперативні / тактичні → простір або проєкт → виконавець → задача → статус.</p>
         </div>
