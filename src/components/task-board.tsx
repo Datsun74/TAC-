@@ -14,6 +14,7 @@ type TaskBoardProps = Readonly<{
   memberName: string;
   testMode: boolean;
   view: "today" | "list" | "history";
+  projectId?: string;
 }>;
 
 type UpdateKind = TaskStatus;
@@ -178,7 +179,7 @@ function PostponeControls({ task, date, isUpdating, onChange, onConfirm, onCance
   );
 }
 
-export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps) {
+export function TaskBoard({ tasks, memberName, testMode, view, projectId }: TaskBoardProps) {
   const router = useRouter();
   const localTasks = useSyncExternalStore(subscribeToLocalTasks, () => (testMode ? readLocalTestTasks() : tasks), () => tasks);
   const [overriddenItems, setOverriddenItems] = useState<readonly Task[] | null>(null);
@@ -202,6 +203,7 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
   const visibleTasks = useMemo(() => {
     return items
       .filter((task) => isInCurrentView(task, view))
+      .filter((task) => !projectId || task.projectId === projectId)
       .filter((task) => selectedAreas.length === 0 || selectedAreas.includes(task.area))
       .filter((task) => selectedHorizons.length === 0 || selectedHorizons.includes(task.horizon))
       .filter((task) => selectedAuthors.length === 0 || selectedAuthors.includes(task.createdByName))
@@ -218,7 +220,7 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
         if (executorDifference !== 0) return executorDifference;
         return left.title.localeCompare(right.title, "uk") || (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31");
       });
-  }, [items, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, view]);
+  }, [items, projectId, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, view]);
 
   const reportRows = useMemo<readonly ReportRow[]>(() => visibleTasks.map((task, index) => {
     const previous = visibleTasks[index - 1];

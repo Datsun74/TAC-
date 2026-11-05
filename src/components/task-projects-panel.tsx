@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
@@ -85,7 +86,7 @@ export function TaskProjectsPanel({ currentMember, spaces, projects, setupError,
           <ul className="mt-6 divide-y divide-stone-100">
             {projects.map((project) => <li className="flex flex-wrap items-center justify-between gap-3 py-4" key={project.id}>
               <div className="min-w-0"><h3 className="font-semibold text-stone-950">{project.name}</h3><p className="mt-1 text-sm text-stone-600">{project.scopeKind === "workspace" ? "Робота" : "Сім’я"}: {project.scopeName} · {taskHorizonLabels[project.horizon]}</p></div>
-              <div className="flex items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${project.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-stone-100 text-stone-600"}`}>{projectStatusLabel(project)}</span>{project.status === "active" ? <button className="min-h-9 rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60" disabled={closingId === project.id} onClick={() => void closeProject(project.id)} type="button">{closingId === project.id ? "Закриваємо…" : "Закрити"}</button> : null}</div>
+              <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${project.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-stone-100 text-stone-600"}`}>{projectStatusLabel(project)}</span><Link className="inline-flex min-h-9 items-center rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-100" href={`/tasks/list?project=${encodeURIComponent(project.id)}`}>Задачі</Link>{project.status === "active" ? <button className="min-h-9 rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60" disabled={closingId === project.id} onClick={() => void closeProject(project.id)} type="button">{closingId === project.id ? "Закриваємо…" : "Закрити"}</button> : null}</div>
             </li>)}
           </ul>
         )}
