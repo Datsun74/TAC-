@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { TaskAttachments } from "@/components/task-attachments";
 import { TaskChecklist } from "@/components/task-checklist";
+import { TaskComments } from "@/components/task-comments";
 import { getTaskUserContext } from "@/lib/task-access";
 import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
 import { isLocalTestMode } from "@/lib/test-mode";
@@ -90,6 +91,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
         setupError={result.checklistError}
         taskId={task.id}
       />
+      <TaskComments currentUserName={member.displayName} initialComments={result.comments} setupError={result.commentsError} taskId={task.id} />
       {result.error ? <p className="mt-6 max-w-3xl rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900" role="status">{result.error}</p> : null}
       {task.scopeKind === "family" && member.family ? (
         <TaskAttachments attachments={result.attachments} currentMember={{ id: member.userId, name: member.displayName }} familyId={member.family.familyId} taskId={task.id} testMode={false} />

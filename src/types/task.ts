@@ -107,6 +107,13 @@ export type TaskActivityEvent = Readonly<{
   occurredAt: string;
 }>;
 
+export type TaskComment = Readonly<{
+  id: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}>;
+
 export function isTaskArea(value: string): value is TaskArea {
   return (taskAreas as readonly string[]).includes(value);
 }

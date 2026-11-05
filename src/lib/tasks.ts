@@ -3,7 +3,7 @@ import "server-only";
 import { getTaskUserContext } from "@/lib/task-access";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalTestMode } from "@/lib/test-mode";
-import { isTaskHorizon, isTaskProjectStatus, isTaskStatus, type Task, type TaskActivityEvent, type TaskAttachment, type TaskChecklistItem, type TaskMember, type TaskParticipant, type TaskProject, type TaskScopeKind, type TaskSpace, type TaskStatus } from "@/types/task";
+import { isTaskHorizon, isTaskProjectStatus, isTaskStatus, type Task, type TaskActivityEvent, type TaskAttachment, type TaskChecklistItem, type TaskComment, type TaskMember, type TaskParticipant, type TaskProject, type TaskScopeKind, type TaskSpace, type TaskStatus } from "@/types/task";
 
 type NameRelation = { name: string } | { name: string }[] | null;
 
@@ -57,6 +57,8 @@ export type TaskDetailResult = Readonly<{
   checklistError: string | null;
   activityEvents: TaskActivityEvent[];
   activityError: string | null;
+  comments: TaskComment[];
+  commentsError: string | null;
   attachments: TaskAttachment[];
   error: string | null;
 }>;
@@ -169,13 +171,15 @@ export async function getTaskDetail(taskId: string, includeAttachments = false):
       checklistError: null,
       activityEvents: [],
       activityError: null,
+      comments: [],
+      commentsError: null,
       attachments: [],
       error: "Не вдалося відкрити задачу. Перевірте підключення задачника.",
     };
   }
 
   if (!data) {
-    return { task: null, checklistItems: [], checklistError: null, activityEvents: [], activityError: null, attachments: [], error: null };
+    return { task: null, checklistItems: [], checklistError: null, activityEvents: [], activityError: null, comments: [], commentsError: null, attachments: [], error: null };
   }
 
   const task = mapTask(data as TaskRow);
@@ -223,8 +227,25 @@ export async function getTaskDetail(taskId: string, includeAttachments = false):
     ? "Повний журнал дій ще не підключено. Виконайте файл supabase/task-activity.sql у SQL Editor."
     : null;
 
+  const { data: commentData, error: commentsQueryError } = await supabase
+    .from("task_comments")
+    .select("id, author_name, body, created_at")
+    .eq("task_id", taskId)
+    .order("created_at");
+  const comments: TaskComment[] = commentsQueryError
+    ? []
+    : (commentData ?? []).map((comment) => ({
+      id: comment.id,
+      authorName: comment.author_name,
+      body: comment.body,
+      createdAt: comment.created_at,
+    }));
+  const commentsError = commentsQueryError
+    ? "Коментарі ще не підключено. Виконайте файл supabase/task-comments.sql у SQL Editor."
+    : null;
+
   if (!includeAttachments || task.scopeKind === "workspace") {
-    return { task, checklistItems, checklistError, activityEvents, activityError, attachments: [], error: null };
+    return { task, checklistItems, checklistError, activityEvents, activityError, comments, commentsError, attachments: [], error: null };
   }
 
   const { data: attachmentData, error: attachmentsError } = await supabase
@@ -240,6 +261,8 @@ export async function getTaskDetail(taskId: string, includeAttachments = false):
       checklistError,
       activityEvents,
       activityError,
+      comments,
+      commentsError,
       attachments: [],
       error: "Задачу відкрито, але вкладення поки недоступні. Виконайте файл supabase/tasks-attachments.sql.",
     };
@@ -251,6 +274,8 @@ export async function getTaskDetail(taskId: string, includeAttachments = false):
     checklistError,
     activityEvents,
     activityError,
+    comments,
+    commentsError,
     attachments: (attachmentData ?? []).map((attachment) => ({
       id: attachment.id,
       originalName: attachment.original_name,
