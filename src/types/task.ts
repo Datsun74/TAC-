@@ -98,6 +98,15 @@ export type TaskChecklistItem = Readonly<{
   completedAt: string | null;
 }>;
 
+export type TaskActivityEvent = Readonly<{
+  id: string;
+  eventType: "created" | "status_changed";
+  actorName: string;
+  previousStatus: TaskStatus | null;
+  nextStatus: TaskStatus;
+  occurredAt: string;
+}>;
+
 export function isTaskArea(value: string): value is TaskArea {
   return (taskAreas as readonly string[]).includes(value);
 }

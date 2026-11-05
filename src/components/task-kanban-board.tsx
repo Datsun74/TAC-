@@ -182,11 +182,19 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
       return;
     }
 
-    const { error: updateError } = await createClient().from("tasks").update(taskUpdate(updatedTask)).eq("id", taskId);
+    const supabase = createClient();
+    const { error: updateError } = await supabase.from("tasks").update(taskUpdate(updatedTask)).eq("id", taskId);
     if (updateError) {
       setOverriddenItems(previousItems);
       setError("Не вдалося змінити стан задачі. Спробуйте перемістити її ще раз.");
     } else {
+      await supabase.from("task_activity_events").insert({
+        task_id: task.id,
+        event_type: "status_changed",
+        actor_name: memberName,
+        previous_status: task.status,
+        next_status: updatedTask.status,
+      });
       router.refresh();
     }
     setMovingTaskId(null);

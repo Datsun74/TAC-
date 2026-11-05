@@ -269,11 +269,19 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
       return;
     }
 
-    const { error: updateError } = await createClient().from("tasks").update(taskUpdate(updatedTask)).eq("id", task.id);
+    const supabase = createClient();
+    const { error: updateError } = await supabase.from("tasks").update(taskUpdate(updatedTask)).eq("id", task.id);
     if (updateError) {
       setOverriddenItems(previousItems);
       setError("Не вдалося оновити задачу. Якщо новий стан «Взята в роботу» не зберігається, виконайте tasks-status-in-work.sql у Supabase.");
     } else {
+      await supabase.from("task_activity_events").insert({
+        task_id: task.id,
+        event_type: "status_changed",
+        actor_name: memberName,
+        previous_status: task.status,
+        next_status: updatedTask.status,
+      });
       if (kind === "postponed") setPostponingTaskId(null);
       router.refresh();
     }

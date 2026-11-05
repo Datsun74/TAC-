@@ -43,11 +43,17 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
   }
 
   const task = result.task;
+  const hasCreatedEvent = result.activityEvents.some((event) => event.eventType === "created");
+  const hasCompletedEvent = result.activityEvents.some((event) => event.nextStatus === "completed");
+  const hasRejectedEvent = result.activityEvents.some((event) => event.nextStatus === "rejected");
   const activity = [
-    { date: task.createdAt, label: "Створено", text: `${task.createdByName} створив(-ла) задачу.` },
-    ...(task.completedAt && task.completedBy ? [{ date: task.completedAt, label: "Виконано", text: `${task.completedBy} позначив(-ла) задачу виконаною.` }] : []),
-    ...(task.rejectedAt && task.rejectedBy ? [{ date: task.rejectedAt, label: "Відхилено", text: `${task.rejectedBy} відхилив(-ла) задачу.` }] : []),
-  ];
+    ...(!hasCreatedEvent ? [{ date: task.createdAt, label: "Створено", text: `${task.createdByName} створив(-ла) задачу.` }] : []),
+    ...result.activityEvents.map((event) => event.eventType === "created"
+      ? { date: event.occurredAt, label: "Створено", text: `${event.actorName} створив(-ла) задачу.` }
+      : { date: event.occurredAt, label: "Змінено стан", text: `${event.actorName} змінив(-ла) стан: «${taskStatusLabels[event.previousStatus ?? "active"]}» → «${taskStatusLabels[event.nextStatus]}».` }),
+    ...(!hasCompletedEvent && task.completedAt && task.completedBy ? [{ date: task.completedAt, label: "Виконано", text: `${task.completedBy} позначив(-ла) задачу виконаною.` }] : []),
+    ...(!hasRejectedEvent && task.rejectedAt && task.rejectedBy ? [{ date: task.rejectedAt, label: "Відхилено", text: `${task.rejectedBy} відхилив(-ла) задачу.` }] : []),
+  ].sort((left, right) => left.date.localeCompare(right.date));
 
   return (
     <section className="w-full py-10 sm:py-14 lg:py-16">
@@ -73,6 +79,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
             {activity.map((entry) => <li className="flex gap-3 text-sm leading-5" key={`${entry.label}-${entry.date}`}><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-700" /><div><p className="font-semibold text-stone-800">{entry.label}</p><p className="text-stone-600">{entry.text}</p><time className="text-xs text-stone-500" dateTime={entry.date}>{formatTaskTimestamp(entry.date)}</time></div></li>)}
             {task.status === "postponed" && task.postponedUntil ? <li className="flex gap-3 text-sm leading-5"><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-400" /><div><p className="font-semibold text-stone-800">Відкладено</p><p className="text-stone-600">Задача відкладена до {formatTaskDate(task.postponedUntil)}.</p></div></li> : null}
           </ol>
+          {result.activityError ? <p className="mt-4 rounded-xl bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">{result.activityError}</p> : null}
         </section>
       </div>
 

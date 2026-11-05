@@ -131,7 +131,7 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
     }
 
     const supabase = createClient();
-    const { error } = selectedProject && values.containerKind === "project"
+    const { data: createdTaskId, error } = selectedProject && values.containerKind === "project"
       ? await supabase.rpc("create_project_task_with_participants", {
         target_project_id: selectedProject.id, task_title: task.title, task_goal: task.goal, task_area: task.area, task_horizon: task.horizon,
         task_due_date: task.dueDate, creator_display_name: currentMember.name, participant_user_ids: selectedParticipants.map((member) => member.id),
@@ -146,6 +146,15 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
       setSubmissionError(saveErrorMessage(error, values.containerKind === "project"));
       setIsSubmitting(false);
       return;
+    }
+    if (typeof createdTaskId === "string") {
+      await supabase.from("task_activity_events").insert({
+        task_id: createdTaskId,
+        event_type: "created",
+        actor_name: currentMember.name,
+        previous_status: null,
+        next_status: "active",
+      });
     }
     router.push("/tasks/list");
     router.refresh();
