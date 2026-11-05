@@ -8,6 +8,10 @@ import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } f
 import { isLocalTestMode } from "@/lib/test-mode";
 import { getTaskDetail } from "@/lib/tasks";
 
+function formatTaskTimestamp(value: string) {
+  return new Intl.DateTimeFormat("uk-UA", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(value));
+}
+
 export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">) {
   const { taskId } = await props.params;
 
@@ -39,6 +43,11 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
   }
 
   const task = result.task;
+  const activity = [
+    { date: task.createdAt, label: "Створено", text: `${task.createdByName} створив(-ла) задачу.` },
+    ...(task.completedAt && task.completedBy ? [{ date: task.completedAt, label: "Виконано", text: `${task.completedBy} позначив(-ла) задачу виконаною.` }] : []),
+    ...(task.rejectedAt && task.rejectedBy ? [{ date: task.rejectedAt, label: "Відхилено", text: `${task.rejectedBy} відхилив(-ла) задачу.` }] : []),
+  ];
 
   return (
     <section className="w-full py-10 sm:py-14 lg:py-16">
@@ -58,6 +67,13 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           {task.projectName ? <div><dt className="text-stone-500">Постійний простір</dt><dd className="mt-1 font-semibold text-stone-800">{task.scopeName}</dd></div> : null}
           <div className="sm:col-span-2"><dt className="text-stone-500">Учасники</dt><dd className="mt-1 font-semibold text-stone-800">{task.participants.length > 0 ? task.participants.map((participant) => participant.name).join(", ") : "Особиста задача"}</dd></div>
         </dl>
+        <section className="mt-7 border-t border-stone-100 pt-5" aria-labelledby="task-activity-heading">
+          <h2 className="text-base font-semibold text-stone-950" id="task-activity-heading">Історія задачі</h2>
+          <ol className="mt-3 space-y-3">
+            {activity.map((entry) => <li className="flex gap-3 text-sm leading-5" key={`${entry.label}-${entry.date}`}><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-700" /><div><p className="font-semibold text-stone-800">{entry.label}</p><p className="text-stone-600">{entry.text}</p><time className="text-xs text-stone-500" dateTime={entry.date}>{formatTaskTimestamp(entry.date)}</time></div></li>)}
+            {task.status === "postponed" && task.postponedUntil ? <li className="flex gap-3 text-sm leading-5"><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-400" /><div><p className="font-semibold text-stone-800">Відкладено</p><p className="text-stone-600">Задача відкладена до {formatTaskDate(task.postponedUntil)}.</p></div></li> : null}
+          </ol>
+        </section>
       </div>
 
       <TaskChecklist
