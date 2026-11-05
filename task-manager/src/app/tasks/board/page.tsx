@@ -17,7 +17,7 @@ export default async function TasksBoardPage() {
         <div>
           <p className="text-sm font-semibold tracking-[0.16em] text-amber-800 uppercase">Огляд процесу</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">Канбан-дошка</h1>
-          <p className="mt-3 max-w-2xl leading-7 text-stone-600">Усі задачі за станами. Фільтруйте рівні планування, напрями та людей одночасно.</p>
+          <p className="mt-3 max-w-2xl leading-7 text-stone-600">Усі задачі за станами. Фільтруйте рівні планування, напрями, людей і проєкти одночасно.</p>
         </div>
         <Link className="inline-flex min-h-11 items-center justify-center rounded-full bg-amber-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-900 focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none" href="/tasks/add">+ Нова задача</Link>
       </div>

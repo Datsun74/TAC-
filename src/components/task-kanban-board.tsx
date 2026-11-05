@@ -49,6 +49,12 @@ function peopleForTask(task: Task) {
   return Array.from(new Set([task.createdByName, ...task.participants.map((participant) => participant.name)]));
 }
 
+function projectOptionsForTasks(tasks: readonly Task[]) {
+  return Array.from(new Map(tasks.filter((task) => task.projectId && task.projectName).map((task) => [task.projectId as string, task.projectName as string])).entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((left, right) => left.name.localeCompare(right.name, "uk"));
+}
+
 function columnStyle(status: TaskStatus) {
   if (status === "completed") return "border-emerald-200 bg-emerald-50/60";
   if (status === "rejected") return "border-red-200 bg-red-50/60";
@@ -95,6 +101,7 @@ function TaskCard({ task, testMode, isMoving, onDragStart, onDragEnd }: TaskCard
   return (
     <article aria-label={`Перетягнути задачу «${task.title}»`} className={`cursor-grab rounded-xl border border-white bg-white p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing ${isMoving ? "opacity-45" : ""}`} draggable={!isMoving} onDragEnd={onDragEnd} onDragStart={(event) => onDragStart(event, task)}>
       <h3 className="break-words text-sm leading-5">{title}</h3>
+      {task.projectName ? <p className="mt-1.5 truncate text-[11px] font-semibold leading-4 text-amber-800" title={`Проєкт: ${task.projectName}`}>▣ {task.projectName}</p> : null}
     </article>
   );
 }
@@ -106,31 +113,35 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
   const [selectedAreas, setSelectedAreas] = useState<readonly TaskArea[]>([]);
   const [selectedHorizons, setSelectedHorizons] = useState<readonly TaskHorizon[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<readonly string[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<readonly string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const items = overriddenItems ?? localTasks;
-  const filtersApplied = selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedPeople.length > 0;
+  const filtersApplied = selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedPeople.length > 0 || selectedProjectIds.length > 0;
 
   const people = useMemo(() => Array.from(new Set(items.flatMap(peopleForTask))).sort((left, right) => left.localeCompare(right, "uk")), [items]);
+  const projects = useMemo(() => projectOptionsForTasks(items), [items]);
   const visibleTasks = useMemo(() => items
     .filter((task) => selectedAreas.length === 0 || selectedAreas.includes(task.area))
     .filter((task) => selectedHorizons.length === 0 || selectedHorizons.includes(task.horizon))
     .filter((task) => selectedPeople.length === 0 || peopleForTask(task).some((person) => selectedPeople.includes(person)))
+    .filter((task) => selectedProjectIds.length === 0 || (task.projectId !== null && selectedProjectIds.includes(task.projectId)))
     .sort((left, right) => {
       const horizonDifference = horizonOrder[left.horizon] - horizonOrder[right.horizon];
       if (horizonDifference !== 0) return horizonDifference;
       const areaDifference = areaOrder[left.area] - areaOrder[right.area];
       if (areaDifference !== 0) return areaDifference;
       return (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31") || left.createdAt.localeCompare(right.createdAt);
-    }), [items, selectedAreas, selectedHorizons, selectedPeople]);
+    }), [items, selectedAreas, selectedHorizons, selectedPeople, selectedProjectIds]);
 
   function clearFilters() {
     setSelectedAreas([]);
     setSelectedHorizons([]);
     setSelectedPeople([]);
+    setSelectedProjectIds([]);
   }
 
   function startDragging(event: DragEvent<HTMLElement>, task: Task) {
@@ -198,13 +209,13 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
     <>
       <section className="mt-8 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm" aria-label="Фільтри Канбан-дошки">
         <div className="flex flex-wrap items-center gap-2">
-          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedPeople.length})` : ""}</button>
+          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedPeople.length + selectedProjectIds.length})` : ""}</button>
           {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={clearFilters} type="button">Очистити</button> : null}
-          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Перетягніть картку до іншої колонки, щоб змінити її стан. Порядок: тактичні → оперативні → стратегічні; робота → сім’я → особисте.</p>
+          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Перетягніть картку до іншої колонки, щоб змінити її стан. Порядок: тактичні → оперативні → стратегічні; робота → сім’я → особисте. Назва проєкту показана під задачею.</p>
         </div>
 
         {filtersOpen ? (
-          <div className="mt-4 grid gap-5 border-t border-stone-100 pt-4 lg:grid-cols-3">
+          <div className="mt-4 grid gap-5 border-t border-stone-100 pt-4 lg:grid-cols-4">
             <fieldset>
               <legend className="text-sm font-semibold text-stone-950">Рівень планування</legend>
               <p className="mt-1 text-xs leading-5 text-stone-500">Можна обрати кілька. Без позначок — усі.</p>
@@ -224,6 +235,13 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
               <p className="mt-1 text-xs leading-5 text-stone-500">Покажемо задачі, де є хоча б одна обрана людина.</p>
               <div className="mt-3 space-y-2">
                 {people.length > 0 ? people.map((person) => <label className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={person}><input checked={selectedPeople.includes(person)} className="size-4 accent-amber-800" onChange={() => setSelectedPeople((current) => toggleChoice(current, person))} type="checkbox" /><span>{person}</span></label>) : <p className="rounded-xl bg-stone-50 px-3 py-3 text-sm text-stone-600">Люди з’являться після створення задач.</p>}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-sm font-semibold text-stone-950">Проєкти</legend>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Позначте один або кілька проєктів. Без вибору — задачі з усіх просторів і проєктів.</p>
+              <div className="mt-3 space-y-2">
+                {projects.length > 0 ? projects.map((project) => <label className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={project.id}><input checked={selectedProjectIds.includes(project.id)} className="size-4 accent-amber-800" onChange={() => setSelectedProjectIds((current) => toggleChoice(current, project.id))} type="checkbox" /><span>{project.name}</span></label>) : <p className="rounded-xl bg-stone-50 px-3 py-3 text-sm text-stone-600">Проєкти з’являться після створення задачі в проєкті.</p>}
               </div>
             </fieldset>
           </div>
