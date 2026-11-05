@@ -33,6 +33,15 @@ export const taskStatusLabels: Record<TaskStatus, string> = {
   postponed: "Відкладена",
 };
 
+export const taskStatusOptions: ReadonlyArray<Readonly<{ value: TaskStatus; label: string }>> = [
+  { value: "active", label: taskStatusLabels.active },
+  { value: "in_work", label: taskStatusLabels.in_work },
+  { value: "in_progress", label: taskStatusLabels.in_progress },
+  { value: "postponed", label: taskStatusLabels.postponed },
+  { value: "completed", label: taskStatusLabels.completed },
+  { value: "rejected", label: taskStatusLabels.rejected },
+];
+
 export function formatTaskDate(value: string) {
   return new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${value}T12:00:00`));
 }

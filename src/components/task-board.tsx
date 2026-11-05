@@ -5,7 +5,7 @@ import { Fragment, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 import { readLocalTestTasks, writeLocalTestTasks } from "@/lib/local-test-tasks";
-import { formatTaskDate, taskAreaLabels, taskAreaOptions, taskHorizonLabels, taskHorizonOptions, taskStatusLabels } from "@/lib/task-options";
+import { formatTaskDate, taskAreaLabels, taskAreaOptions, taskHorizonLabels, taskHorizonOptions, taskStatusLabels, taskStatusOptions } from "@/lib/task-options";
 import { createClient } from "@/lib/supabase/client";
 import type { Task, TaskArea, TaskHorizon, TaskStatus } from "@/types/task";
 
@@ -206,6 +206,7 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
   const [selectedAuthors, setSelectedAuthors] = useState<readonly string[]>([]);
   const [selectedExecutors, setSelectedExecutors] = useState<readonly string[]>([]);
   const [selectedContainers, setSelectedContainers] = useState<readonly string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<readonly TaskStatus[]>([]);
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
@@ -213,7 +214,7 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
   const [postponeDate, setPostponeDate] = useState("");
   const [error, setError] = useState("");
   const items = overriddenItems ?? localTasks;
-  const filtersApplied = Boolean(search.trim()) || selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedAuthors.length > 0 || selectedExecutors.length > 0 || selectedContainers.length > 0;
+  const filtersApplied = Boolean(search.trim()) || selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedAuthors.length > 0 || selectedExecutors.length > 0 || selectedContainers.length > 0 || selectedStatuses.length > 0;
 
   const authorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map((task) => task.createdByName))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
   const executorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map(participantLabel))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
@@ -229,6 +230,7 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
       .filter((task) => selectedAuthors.length === 0 || selectedAuthors.includes(task.createdByName))
       .filter((task) => selectedExecutors.length === 0 || selectedExecutors.includes(participantLabel(task)))
       .filter((task) => selectedContainers.length === 0 || selectedContainers.includes(containerLabel(task)))
+      .filter((task) => selectedStatuses.length === 0 || selectedStatuses.includes(task.status))
       .sort((left, right) => {
         const authorDifference = left.createdByName.localeCompare(right.createdByName, "uk");
         if (authorDifference !== 0) return authorDifference;
@@ -240,7 +242,7 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
         if (executorDifference !== 0) return executorDifference;
         return left.title.localeCompare(right.title, "uk") || (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31");
       });
-  }, [items, projectId, search, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, view]);
+  }, [items, projectId, search, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, selectedStatuses, view]);
 
   const reportRows = useMemo<readonly ReportRow[]>(() => visibleTasks.map((task, index) => {
     const previous = visibleTasks[index - 1];
@@ -320,8 +322,8 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
       <section className="task-print-control mt-8 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm" aria-label="Керування списком задач">
         <div className="flex flex-wrap items-center gap-2">
           <label className="min-w-[13rem] flex-1 sm:max-w-sm"><span className="sr-only">Пошук задач</span><input className="min-h-10 w-full rounded-full border border-stone-300 bg-white px-4 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-amber-700 focus:ring-2 focus:ring-amber-100" onChange={(event) => setSearch(event.target.value)} placeholder="Пошук задач, проєктів, людей…" type="search" value={search} /></label>
-          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedAuthors.length + selectedExecutors.length + selectedContainers.length + (search.trim() ? 1 : 0)})` : ""}</button>
-          {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSearch(""); setSelectedAreas([]); setSelectedHorizons([]); setSelectedAuthors([]); setSelectedExecutors([]); setSelectedContainers([]); }} type="button">Очистити</button> : null}
+          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedAuthors.length + selectedExecutors.length + selectedContainers.length + selectedStatuses.length + (search.trim() ? 1 : 0)})` : ""}</button>
+          {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSearch(""); setSelectedAreas([]); setSelectedHorizons([]); setSelectedAuthors([]); setSelectedExecutors([]); setSelectedContainers([]); setSelectedStatuses([]); }} type="button">Очистити</button> : null}
           <button className="min-h-10 rounded-full border border-amber-800 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50" onClick={() => window.print()} type="button">Друк / PDF</button>
           <button className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={exportWordReport} type="button">Завантажити Word</button>
           <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Порядок звіту: автор → стратегічні / оперативні / тактичні → простір або проєкт → виконавець → задача → статус.</p>
@@ -362,6 +364,13 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
               <p className="mt-1 text-xs leading-5 text-stone-500">Можна поєднати, наприклад, лише «Сім’я» з двома рівнями планування.</p>
               <div className="mt-3 space-y-2">
                 {taskAreaOptions.map((option) => <label className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={option.value}><input checked={selectedAreas.includes(option.value)} className="size-4 accent-amber-800" onChange={() => setSelectedAreas((current) => toggleChoice(current, option.value))} type="checkbox" /><span>{option.label}</span></label>)}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-sm font-semibold text-stone-950">Стан</legend>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Для звіту або списку можна обрати один чи кілька станів.</p>
+              <div className="mt-3 space-y-2">
+                {taskStatusOptions.map((option) => <label className="flex min-h-9 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={option.value}><input checked={selectedStatuses.includes(option.value)} className="size-4 accent-amber-800" onChange={() => setSelectedStatuses((current) => toggleChoice(current, option.value))} type="checkbox" /><span>{option.label}</span></label>)}
               </div>
             </fieldset>
           </div>
