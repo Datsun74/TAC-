@@ -5,7 +5,7 @@ import { type DragEvent, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 import { readLocalTestTasks, writeLocalTestTasks } from "@/lib/local-test-tasks";
-import { taskAreaOptions, taskHorizonOptions, taskStatusLabels, taskStatusOptions } from "@/lib/task-options";
+import { taskAreaOptions, taskHorizonLabels, taskHorizonOptions, taskStatusLabels, taskStatusOptions } from "@/lib/task-options";
 import { createClient } from "@/lib/supabase/client";
 import type { Task, TaskArea, TaskHorizon, TaskStatus } from "@/types/task";
 
@@ -24,6 +24,7 @@ type TaskCardProps = Readonly<{
 }>;
 
 const columns: readonly TaskStatus[] = ["active", "in_work", "in_progress", "postponed", "completed", "rejected"];
+const orderedHorizons: readonly TaskHorizon[] = ["tactical", "operational", "strategic"];
 const horizonOrder: Record<TaskHorizon, number> = { tactical: 0, operational: 1, strategic: 2 };
 const areaOrder: Record<TaskArea, number> = { work: 0, family: 1, personal: 2 };
 
@@ -53,6 +54,25 @@ function projectOptionsForTasks(tasks: readonly Task[]) {
   return Array.from(new Map(tasks.filter((task) => task.projectId && task.projectName).map((task) => [task.projectId as string, task.projectName as string])).entries())
     .map(([id, name]) => ({ id, name }))
     .sort((left, right) => left.name.localeCompare(right.name, "uk"));
+}
+
+function taskContainer(task: Task) {
+  if (task.projectId && task.projectName) {
+    return { id: `project-${task.projectId}`, label: `Проєкт · ${task.projectName}`, sortOrder: 0 };
+  }
+
+  return { id: `space-${task.scopeKind}-${task.scopeId}`, label: `Простір · ${task.scopeName}`, sortOrder: 1 };
+}
+
+function taskGroupsForHorizon(tasks: readonly Task[]) {
+  const groups = new Map<string, { id: string; label: string; sortOrder: number; tasks: Task[] }>();
+  tasks.forEach((task) => {
+    const container = taskContainer(task);
+    const group = groups.get(container.id) ?? { id: container.id, label: container.label, sortOrder: container.sortOrder, tasks: [] };
+    group.tasks.push(task);
+    groups.set(container.id, group);
+  });
+  return Array.from(groups.values()).sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label, "uk"));
 }
 
 function taskMatchesSearch(task: Task, search: string) {
@@ -109,7 +129,6 @@ function TaskCard({ task, testMode, isMoving, onDragStart, onDragEnd }: TaskCard
   return (
     <article aria-label={`Перетягнути задачу «${task.title}»`} className={`cursor-grab rounded-xl border border-white bg-white p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing ${isMoving ? "opacity-45" : ""}`} draggable={!isMoving} onDragEnd={onDragEnd} onDragStart={(event) => onDragStart(event, task)}>
       <h3 className="break-words text-sm leading-5">{title}</h3>
-      {task.projectName ? <p className="mt-1.5 truncate text-[11px] font-semibold leading-4 text-amber-800" title={`Проєкт: ${task.projectName}`}>▣ {task.projectName}</p> : null}
     </article>
   );
 }
@@ -222,7 +241,17 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
     return (
       <section className={`${columnStyle(status)} ${isDropTarget ? "ring-2 ring-amber-700 ring-offset-2" : ""} min-w-0 rounded-2xl border p-3 transition-shadow`} key={status} onDragOver={(event) => allowDrop(event, status)} onDrop={(event) => dropTask(event, status)}>
         <div className="flex items-center justify-between gap-2"><h2 className="min-w-0 text-sm font-semibold leading-5 text-stone-950">{taskStatusLabels[status]}</h2><span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-stone-700">{columnTasks.length}</span></div>
-        <div className="mt-3 space-y-3">{columnTasks.length > 0 ? columnTasks.map((task) => <TaskCard isMoving={movingTaskId === task.id} key={task.id} onDragEnd={() => { setDraggedTaskId(null); setDropTargetStatus(null); }} onDragStart={startDragging} task={task} testMode={testMode} />) : <p className="rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Перетягніть сюди задачу.</p>}</div>
+        {columnTasks.length > 0 ? <div className="mt-3 space-y-4">{orderedHorizons.map((horizon) => {
+          const groups = taskGroupsForHorizon(columnTasks.filter((task) => task.horizon === horizon));
+          if (groups.length === 0) return null;
+          return <section className="space-y-2" key={horizon}>
+            <h3 className="border-b border-stone-200 pb-1 text-[11px] font-bold tracking-wide text-stone-600 uppercase">{taskHorizonLabels[horizon]}</h3>
+            {groups.map((group) => <div className="space-y-2" key={group.id}>
+              <p className="truncate px-1 text-[11px] font-semibold leading-4 text-amber-900" title={group.label}>{group.label}</p>
+              <div className="space-y-2">{group.tasks.map((task) => <TaskCard isMoving={movingTaskId === task.id} key={task.id} onDragEnd={() => { setDraggedTaskId(null); setDropTargetStatus(null); }} onDragStart={startDragging} task={task} testMode={testMode} />)}</div>
+            </div>)}
+          </section>;
+        })}</div> : <p className="mt-3 rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Перетягніть сюди задачу.</p>}
       </section>
     );
   }
