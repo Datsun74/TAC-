@@ -31,6 +31,7 @@ function mobileIcon(href: string) {
   if (href === "/tasks/board") return "▦";
   if (href === "/tasks/add") return "+";
   if (href === "/tasks/history") return "✓";
+  if (href === "/tasks/projects") return "▣";
   return "×";
 }
 

@@ -19,8 +19,15 @@ type TaskBoardProps = Readonly<{
 type UpdateKind = TaskStatus;
 
 const taskControlClass = "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold leading-4 transition-colors disabled:cursor-wait disabled:opacity-60";
-const horizonOrder: Record<TaskHorizon, number> = { tactical: 0, operational: 1, strategic: 2 };
-const areaOrder: Record<TaskArea, number> = { work: 0, family: 1, personal: 2 };
+const horizonOrder: Record<TaskHorizon, number> = { strategic: 0, operational: 1, tactical: 2 };
+
+type ReportRow = Readonly<{
+  task: Task;
+  showAuthor: boolean;
+  showHorizon: boolean;
+  showContainer: boolean;
+  showExecutor: boolean;
+}>;
 
 function subscribeToLocalTasks() {
   return () => {};
@@ -102,6 +109,10 @@ function participantLabel(task: Task) {
   return Array.from(new Set([task.createdByName, ...task.participants.map((participant) => participant.name)])).join(", ");
 }
 
+function containerLabel(task: Task) {
+  return task.projectName ? `Проєкт: ${task.projectName}` : `Простір: ${task.scopeName}`;
+}
+
 function deadlineLabel(task: Task) {
   if (task.status === "postponed" && task.postponedUntil) return `До ${formatTaskDate(task.postponedUntil)}`;
   return task.dueDate ? formatTaskDate(task.dueDate) : "Без дати";
@@ -173,27 +184,50 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
   const [overriddenItems, setOverriddenItems] = useState<readonly Task[] | null>(null);
   const [selectedAreas, setSelectedAreas] = useState<readonly TaskArea[]>([]);
   const [selectedHorizons, setSelectedHorizons] = useState<readonly TaskHorizon[]>([]);
+  const [selectedAuthors, setSelectedAuthors] = useState<readonly string[]>([]);
+  const [selectedExecutors, setSelectedExecutors] = useState<readonly string[]>([]);
+  const [selectedContainers, setSelectedContainers] = useState<readonly string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [postponingTaskId, setPostponingTaskId] = useState<string | null>(null);
   const [postponeDate, setPostponeDate] = useState("");
   const [error, setError] = useState("");
   const items = overriddenItems ?? localTasks;
-  const filtersApplied = selectedAreas.length > 0 || selectedHorizons.length > 0;
+  const filtersApplied = selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedAuthors.length > 0 || selectedExecutors.length > 0 || selectedContainers.length > 0;
+
+  const authorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map((task) => task.createdByName))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
+  const executorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map(participantLabel))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
+  const containerOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map(containerLabel))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
 
   const visibleTasks = useMemo(() => {
     return items
       .filter((task) => isInCurrentView(task, view))
       .filter((task) => selectedAreas.length === 0 || selectedAreas.includes(task.area))
       .filter((task) => selectedHorizons.length === 0 || selectedHorizons.includes(task.horizon))
+      .filter((task) => selectedAuthors.length === 0 || selectedAuthors.includes(task.createdByName))
+      .filter((task) => selectedExecutors.length === 0 || selectedExecutors.includes(participantLabel(task)))
+      .filter((task) => selectedContainers.length === 0 || selectedContainers.includes(containerLabel(task)))
       .sort((left, right) => {
+        const authorDifference = left.createdByName.localeCompare(right.createdByName, "uk");
+        if (authorDifference !== 0) return authorDifference;
         const horizonDifference = horizonOrder[left.horizon] - horizonOrder[right.horizon];
         if (horizonDifference !== 0) return horizonDifference;
-        const areaDifference = areaOrder[left.area] - areaOrder[right.area];
-        if (areaDifference !== 0) return areaDifference;
-        return (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31") || left.createdAt.localeCompare(right.createdAt);
+        const containerDifference = containerLabel(left).localeCompare(containerLabel(right), "uk");
+        if (containerDifference !== 0) return containerDifference;
+        const executorDifference = participantLabel(left).localeCompare(participantLabel(right), "uk");
+        if (executorDifference !== 0) return executorDifference;
+        return left.title.localeCompare(right.title, "uk") || (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31");
       });
-  }, [items, selectedAreas, selectedHorizons, view]);
+  }, [items, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, view]);
+
+  const reportRows = useMemo<readonly ReportRow[]>(() => visibleTasks.map((task, index) => {
+    const previous = visibleTasks[index - 1];
+    const authorChanged = !previous || previous.createdByName !== task.createdByName;
+    const horizonChanged = authorChanged || previous.horizon !== task.horizon;
+    const containerChanged = horizonChanged || !previous || containerLabel(previous) !== containerLabel(task);
+    const executorChanged = containerChanged || !previous || participantLabel(previous) !== participantLabel(task);
+    return { task, showAuthor: authorChanged, showHorizon: horizonChanged, showContainer: containerChanged, showExecutor: executorChanged };
+  }), [visibleTasks]);
 
   async function updateStatus(task: Task, kind: UpdateKind, postponedUntil?: string) {
     const updatedTask = nextTask(task, kind, memberName, postponedUntil);
@@ -240,19 +274,40 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
 
       <section className="task-print-control mt-8 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm" aria-label="Керування списком задач">
         <div className="flex flex-wrap items-center gap-2">
-          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length})` : ""}</button>
-          {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSelectedAreas([]); setSelectedHorizons([]); }} type="button">Очистити</button> : null}
+          <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedAuthors.length + selectedExecutors.length + selectedContainers.length})` : ""}</button>
+          {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSelectedAreas([]); setSelectedHorizons([]); setSelectedAuthors([]); setSelectedExecutors([]); setSelectedContainers([]); }} type="button">Очистити</button> : null}
           <button className="min-h-10 rounded-full border border-amber-800 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50" onClick={() => window.print()} type="button">Друк / PDF</button>
-          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Порядок: тактичні → оперативні → стратегічні; у кожній групі: робота → сім’я → особисте.</p>
+          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Порядок звіту: автор → стратегічні / оперативні / тактичні → простір або проєкт → виконавець → задача → статус.</p>
         </div>
 
         {filtersOpen ? (
-          <div className="mt-4 grid gap-5 border-t border-stone-100 pt-4 sm:grid-cols-2">
+          <div className="mt-4 grid gap-5 border-t border-stone-100 pt-4 sm:grid-cols-2 xl:grid-cols-3">
             <fieldset>
               <legend className="text-sm font-semibold text-stone-950">Рівень планування</legend>
               <p className="mt-1 text-xs leading-5 text-stone-500">Позначте один або кілька рівнів. Без позначок — усі.</p>
               <div className="mt-3 space-y-2">
                 {taskHorizonOptions.map((option) => <label className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={option.value}><input checked={selectedHorizons.includes(option.value)} className="size-4 accent-amber-800" onChange={() => setSelectedHorizons((current) => toggleChoice(current, option.value))} type="checkbox" /><span>{option.label} <span className="text-stone-500">— {option.hint}</span></span></label>)}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-sm font-semibold text-stone-950">Автор</legend>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Хто створив задачу.</p>
+              <div className="mt-3 space-y-2">
+                {authorOptions.map((author) => <label className="flex min-h-9 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={author}><input checked={selectedAuthors.includes(author)} className="size-4 accent-amber-800" onChange={() => setSelectedAuthors((current) => toggleChoice(current, author))} type="checkbox" /><span>{author}</span></label>)}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-sm font-semibold text-stone-950">Виконавець</legend>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Автор і всі запрошені учасники задачі.</p>
+              <div className="mt-3 space-y-2">
+                {executorOptions.map((executor) => <label className="flex min-h-9 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={executor}><input checked={selectedExecutors.includes(executor)} className="size-4 accent-amber-800" onChange={() => setSelectedExecutors((current) => toggleChoice(current, executor))} type="checkbox" /><span>{executor}</span></label>)}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-sm font-semibold text-stone-950">Простір / проєкт</legend>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Можна поєднати кілька постійних просторів і проєктів.</p>
+              <div className="mt-3 space-y-2">
+                {containerOptions.map((container) => <label className="flex min-h-9 items-center gap-3 rounded-xl px-3 text-sm text-stone-800 hover:bg-stone-50" key={container}><input checked={selectedContainers.includes(container)} className="size-4 accent-amber-800" onChange={() => setSelectedContainers((current) => toggleChoice(current, container))} type="checkbox" /><span>{container}</span></label>)}
               </div>
             </fieldset>
             <fieldset>
@@ -282,7 +337,7 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
                   <div className="min-w-0"><h2 className="text-sm font-semibold leading-5 text-stone-950">{taskTitle(task)}</h2>{task.goal ? <p className="mt-0.5 text-xs leading-4 text-stone-600">{task.goal}</p> : null}</div>
                   <span className={"shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold leading-4 " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span>
                 </div>
-                <div className="mt-2 grid gap-0.5 text-xs leading-4 text-stone-700"><p><span className="font-medium text-stone-950">{taskHorizonLabels[task.horizon]}</span> · {taskAreaLabels[task.area]}</p><p>Строк: {deadlineLabel(task)}</p><p className="text-stone-600">Учасники: {participantLabel(task)}</p></div>
+                <div className="mt-2 grid gap-0.5 text-xs leading-4 text-stone-700"><p><span className="font-medium text-stone-950">{taskHorizonLabels[task.horizon]}</span> · {taskAreaLabels[task.area]}</p><p>{containerLabel(task)}</p><p>Строк: {deadlineLabel(task)}</p><p className="text-stone-600">Учасники: {participantLabel(task)}</p></div>
                 <div className="task-print-action mt-2.5 flex flex-wrap gap-1.5"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div>
                 {postponingTaskId === task.id ? <div className="mt-3 border-t border-amber-100 pt-3"><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></div> : null}
               </article>
@@ -291,11 +346,21 @@ export function TaskBoard({ tasks, memberName, testMode, view }: TaskBoardProps)
 
           <div className="task-list-table-wrapper mt-6 hidden overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm xl:block">
               <table className="task-list-table w-full table-fixed border-collapse text-left text-sm">
-                <caption className="sr-only">Список задач</caption>
-                <colgroup><col className="w-[23%]" /><col className="w-[8%]" /><col className="w-[12%]" /><col className="w-[15%]" /><col className="w-[12%]" /><col className="w-[10%]" /><col className="w-[20%]" /></colgroup>
-                <thead className="bg-stone-50 text-[11px] uppercase tracking-wide text-stone-600"><tr><th className="px-3 py-3 font-semibold" scope="col">Задача</th><th className="px-3 py-3 font-semibold" scope="col">Напрям</th><th className="px-3 py-3 font-semibold" scope="col">Планування</th><th className="px-3 py-3 font-semibold" scope="col">Учасники</th><th className="px-3 py-3 font-semibold" scope="col">Строк</th><th className="px-3 py-3 font-semibold" scope="col">Стан</th><th className="task-print-action px-3 py-3 font-semibold"><span className="sr-only">Дії</span></th></tr></thead>
+                <caption className="sr-only">Звіт задач, згрупований за автором, плануванням, простором або проєктом та виконавцем</caption>
+                <colgroup><col className="w-[11%]" /><col className="w-[12%]" /><col className="w-[15%]" /><col className="w-[14%]" /><col className="w-[26%]" /><col className="w-[9%]" /><col className="w-[13%]" /></colgroup>
+                <thead className="bg-stone-50 text-[11px] uppercase tracking-wide text-stone-600"><tr><th className="px-3 py-3 font-semibold" scope="col">Автор</th><th className="px-3 py-3 font-semibold" scope="col">Планування</th><th className="px-3 py-3 font-semibold" scope="col">Простір / проєкт</th><th className="px-3 py-3 font-semibold" scope="col">Виконавець</th><th className="px-3 py-3 font-semibold" scope="col">Назва / суть і коментар</th><th className="px-3 py-3 font-semibold" scope="col">Статус</th><th className="task-print-action px-3 py-3 font-semibold"><span className="sr-only">Дії</span></th></tr></thead>
                 <tbody>
-                  {visibleTasks.map((task) => <Fragment key={task.id}><tr className="border-t border-stone-100 align-top transition-colors hover:bg-stone-50/80"><th className="break-words px-3 py-3 font-semibold text-stone-950" scope="row">{taskTitle(task)}{task.goal ? <p className="mt-0.5 font-normal leading-5 text-stone-600">{task.goal}</p> : null}<p className="mt-1 text-xs font-normal text-stone-500">{task.scopeName}</p></th><td className="break-words px-3 py-3 text-stone-800">{taskAreaLabels[task.area]}</td><td className="break-words px-3 py-3 text-stone-800">{taskHorizonLabels[task.horizon]}</td><td className="break-words px-3 py-3 leading-5 text-stone-800">{participantLabel(task)}</td><td className="break-words px-3 py-3 text-stone-800">{deadlineLabel(task)}</td><td className="px-3 py-3"><span className={"inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span></td><td className="task-print-action px-3 py-2"><div className="flex flex-col items-stretch gap-1"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div></td></tr>{postponingTaskId === task.id ? <tr className="border-t border-amber-100 bg-amber-50"><td className="px-5 py-4" colSpan={7}><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></td></tr> : null}</Fragment>)}
+                  {reportRows.map((row) => {
+                    const task = row.task;
+                    return <Fragment key={task.id}>
+                      {row.showAuthor ? <tr className="border-t border-stone-200 bg-stone-50/70"><th className="break-words px-3 py-2.5 font-semibold text-stone-950" scope="rowgroup">{task.createdByName}</th><td colSpan={6} /></tr> : null}
+                      {row.showHorizon ? <tr className="border-t border-stone-100 bg-stone-50/40"><td /><th className="break-words px-3 py-2 text-sm font-semibold text-stone-800" scope="rowgroup">{taskHorizonLabels[task.horizon]}</th><td colSpan={5} /></tr> : null}
+                      {row.showContainer ? <tr className="border-t border-stone-100"><td /><td /><th className="break-words px-3 py-2 text-sm font-semibold text-stone-800" scope="rowgroup">{containerLabel(task)}</th><td colSpan={4} /></tr> : null}
+                      {row.showExecutor ? <tr className="border-t border-stone-100"><td /><td /><td /><th className="break-words px-3 py-2 text-sm font-semibold text-stone-800" scope="rowgroup">{participantLabel(task)}</th><td colSpan={3} /></tr> : null}
+                      <tr className="border-t border-stone-100 align-top transition-colors hover:bg-stone-50/80"><td /><td /><td /><td /><th className="break-words px-3 py-2.5 font-semibold text-stone-950" scope="row">{taskTitle(task)}<p className="mt-1 text-xs font-normal text-stone-500">{taskAreaLabels[task.area]} · Строк: {deadlineLabel(task)}</p>{task.goal ? <p className="mt-1 font-normal leading-5 text-stone-600">{task.goal}</p> : null}</th><td className="px-3 py-2.5"><span className={"inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold " + statusClass(task.status)}>{taskStatusLabels[task.status]}</span></td><td className="task-print-action px-3 py-2"><div className="flex flex-col items-stretch gap-1"><TaskActions isUpdating={isUpdating === task.id} onStartPostponing={startPostponing} onUpdate={(target, kind) => void updateStatus(target, kind)} task={task} view={view} /></div></td></tr>
+                      {postponingTaskId === task.id ? <tr className="border-t border-amber-100 bg-amber-50"><td className="px-5 py-4" colSpan={7}><PostponeControls date={postponeDate} isUpdating={isUpdating === task.id} onCancel={() => setPostponingTaskId(null)} onChange={setPostponeDate} onConfirm={() => void updateStatus(task, "postponed", postponeDate)} task={task} /></td></tr> : null}
+                    </Fragment>;
+                  })}
                 </tbody>
               </table>
           </div>

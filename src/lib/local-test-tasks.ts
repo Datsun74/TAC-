@@ -35,6 +35,8 @@ function exampleTasks(): Task[] {
       scopeKind: "family",
       scopeId: "local-test-family",
       scopeName: "Тестова сім’я",
+      projectId: null,
+      projectName: null,
     },
     {
       id: "local-task-ielts",
@@ -55,6 +57,8 @@ function exampleTasks(): Task[] {
       scopeKind: "family",
       scopeId: "local-test-family",
       scopeName: "Тестова сім’я",
+      projectId: null,
+      projectName: null,
     },
     {
       id: "local-task-repair",
@@ -75,6 +79,8 @@ function exampleTasks(): Task[] {
       scopeKind: "family",
       scopeId: "local-test-family",
       scopeName: "Тестова сім’я",
+      projectId: "local-test-project-home",
+      projectName: "Тестовий ремонт будинку",
     },
   ];
 }
@@ -143,6 +149,8 @@ function toTask(value: unknown): Task | null {
     scopeKind: task.scopeKind,
     scopeId: task.scopeId,
     scopeName: task.scopeName,
+    projectId: typeof task.projectId === "string" ? task.projectId : null,
+    projectName: typeof task.projectName === "string" ? task.projectName : null,
   };
 }
 

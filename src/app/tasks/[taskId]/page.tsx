@@ -48,13 +48,14 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-950">{taskAreaLabels[task.area]}</span>
           <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-700">{taskHorizonLabels[task.horizon]}</span>
           <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-700">{taskStatusLabels[task.status]}</span>
-          <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-700">{task.scopeName}</span>
+          <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-700">{task.projectName ? `Проєкт: ${task.projectName}` : `Простір: ${task.scopeName}`}</span>
         </div>
         <h1 className="mt-5 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">{task.title}</h1>
         {task.goal ? <p className="mt-5 whitespace-pre-wrap leading-7 text-stone-700">{task.goal}</p> : <p className="mt-5 text-stone-500">Кінцеву мету не вказано.</p>}
         <dl className="mt-7 grid gap-5 border-t border-stone-100 pt-5 text-sm sm:grid-cols-2">
           <div><dt className="text-stone-500">Створив</dt><dd className="mt-1 font-semibold text-stone-800">{task.createdByName}</dd></div>
           <div><dt className="text-stone-500">Строк</dt><dd className="mt-1 font-semibold text-stone-800">{task.dueDate ? formatTaskDate(task.dueDate) : "Не встановлено"}</dd></div>
+          {task.projectName ? <div><dt className="text-stone-500">Постійний простір</dt><dd className="mt-1 font-semibold text-stone-800">{task.scopeName}</dd></div> : null}
           <div className="sm:col-span-2"><dt className="text-stone-500">Учасники</dt><dd className="mt-1 font-semibold text-stone-800">{task.participants.length > 0 ? task.participants.map((participant) => participant.name).join(", ") : "Особиста задача"}</dd></div>
         </dl>
       </div>

@@ -1,10 +1,12 @@
 export const taskAreas = ["work", "family", "personal"] as const;
 export const taskHorizons = ["strategic", "operational", "tactical"] as const;
 export const taskStatuses = ["active", "in_work", "in_progress", "completed", "rejected", "postponed"] as const;
+export const taskProjectStatuses = ["active", "closed"] as const;
 
 export type TaskArea = (typeof taskAreas)[number];
 export type TaskHorizon = (typeof taskHorizons)[number];
 export type TaskStatus = (typeof taskStatuses)[number];
+export type TaskProjectStatus = (typeof taskProjectStatuses)[number];
 export type TaskScopeKind = "family" | "workspace";
 export type TaskWorkspaceRole = "owner" | "manager" | "worker";
 
@@ -32,6 +34,8 @@ export type Task = Readonly<{
   scopeKind: TaskScopeKind;
   scopeId: string;
   scopeName: string;
+  projectId: string | null;
+  projectName: string | null;
 }>;
 
 export type TaskMember = Readonly<{
@@ -44,6 +48,19 @@ export type TaskSpace = Readonly<{
   kind: TaskScopeKind;
   name: string;
   members: readonly TaskMember[];
+}>;
+
+export type TaskProject = Readonly<{
+  id: string;
+  name: string;
+  horizon: TaskHorizon;
+  status: TaskProjectStatus;
+  scopeKind: TaskScopeKind;
+  scopeId: string;
+  scopeName: string;
+  createdByName: string;
+  createdAt: string;
+  closedAt: string | null;
 }>;
 
 export type TaskWorkspace = Readonly<{
@@ -91,4 +108,8 @@ export function isTaskHorizon(value: string): value is TaskHorizon {
 
 export function isTaskStatus(value: string): value is TaskStatus {
   return (taskStatuses as readonly string[]).includes(value);
+}
+
+export function isTaskProjectStatus(value: string): value is TaskProjectStatus {
+  return (taskProjectStatuses as readonly string[]).includes(value);
 }

@@ -11,7 +11,13 @@ export default async function AddTaskPage() {
       <h1 className="mt-3 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">Нова задача</h1>
       <p className="mt-3 max-w-2xl leading-7 text-stone-600">Додайте коротку суть, результат, строк і людей, які виконуватимуть задачу разом з вами.</p>
       {context.error ? <p className="mt-6 max-w-3xl rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{context.error}</p> : null}
-      <AddTaskForm currentMember={context.currentMember} spaces={context.spaces} testMode={isLocalTestMode()} />
+      <AddTaskForm
+        currentMember={context.currentMember}
+        projects={context.projects}
+        projectsSetupError={context.projectsSetupError}
+        spaces={context.spaces}
+        testMode={isLocalTestMode()}
+      />
     </section>
   );
 }
