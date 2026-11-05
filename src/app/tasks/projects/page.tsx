@@ -1,9 +1,12 @@
 import { TaskProjectsPanel } from "@/components/task-projects-panel";
 import { isLocalTestMode } from "@/lib/test-mode";
-import { getTaskFormContext } from "@/lib/tasks";
+import { getTaskFormContext, getTasks } from "@/lib/tasks";
+import { taskStatuses } from "@/types/task";
 
 export default async function TaskProjectsPage() {
+  const testMode = isLocalTestMode();
   const context = await getTaskFormContext();
+  const taskResult = testMode ? null : await getTasks(taskStatuses);
 
   return (
     <section className="w-full py-10 sm:py-14 lg:py-16">
@@ -11,7 +14,7 @@ export default async function TaskProjectsPage() {
       <h1 className="mt-3 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">Проєкти</h1>
       <p className="mt-3 max-w-3xl leading-7 text-stone-600">Простори є постійними, а проєкти мають конкретну мету та строк життя. Один проєкт може містити багато задач і підзадач.</p>
       {context.error ? <p className="mt-6 max-w-3xl rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{context.error}</p> : null}
-      <TaskProjectsPanel currentMember={context.currentMember} projects={context.projects} setupError={context.projectsSetupError} spaces={context.spaces} testMode={isLocalTestMode()} />
+      <TaskProjectsPanel currentMember={context.currentMember} projects={context.projects} setupError={context.projectsSetupError} spaces={context.spaces} tasks={taskResult?.tasks ?? []} testMode={testMode} />
     </section>
   );
 }

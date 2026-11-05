@@ -6,12 +6,13 @@ import { type FormEvent, useState } from "react";
 
 import { taskHorizonOptions, taskHorizonLabels } from "@/lib/task-options";
 import { createClient } from "@/lib/supabase/client";
-import type { TaskHorizon, TaskMember, TaskProject, TaskSpace } from "@/types/task";
+import type { Task, TaskHorizon, TaskMember, TaskProject, TaskSpace } from "@/types/task";
 
 type TaskProjectsPanelProps = Readonly<{
   currentMember: TaskMember;
   spaces: readonly TaskSpace[];
   projects: readonly TaskProject[];
+  tasks: readonly Task[];
   setupError: string | null;
   testMode: boolean;
 }>;
@@ -20,7 +21,17 @@ function projectStatusLabel(project: TaskProject) {
   return project.status === "active" ? "Активний" : "Закритий";
 }
 
-export function TaskProjectsPanel({ currentMember, spaces, projects, setupError, testMode }: TaskProjectsPanelProps) {
+function projectSummary(projectId: string, tasks: readonly Task[]) {
+  const projectTasks = tasks.filter((task) => task.projectId === projectId);
+  return {
+    total: projectTasks.length,
+    active: projectTasks.filter((task) => task.status === "active").length,
+    inProgress: projectTasks.filter((task) => task.status === "in_work" || task.status === "in_progress").length,
+    completed: projectTasks.filter((task) => task.status === "completed").length,
+  };
+}
+
+export function TaskProjectsPanel({ currentMember, spaces, projects, tasks, setupError, testMode }: TaskProjectsPanelProps) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [scopeId, setScopeId] = useState("");
@@ -84,10 +95,13 @@ export function TaskProjectsPanel({ currentMember, spaces, projects, setupError,
         {setupError ? <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">{setupError}</p> : null}
         {projects.length === 0 ? <p className="mt-6 rounded-2xl bg-stone-100 px-4 py-4 text-sm leading-6 text-stone-600">Проєктів поки немає. Постійні «Дача», «Квартира» тощо створюйте як простори, а конкретні роботи — як проєкти.</p> : (
           <ul className="mt-6 divide-y divide-stone-100">
-            {projects.map((project) => <li className="flex flex-wrap items-center justify-between gap-3 py-4" key={project.id}>
-              <div className="min-w-0"><h3 className="font-semibold text-stone-950">{project.name}</h3><p className="mt-1 text-sm text-stone-600">{project.scopeKind === "workspace" ? "Робота" : "Сім’я"}: {project.scopeName} · {taskHorizonLabels[project.horizon]}</p></div>
+            {projects.map((project) => {
+              const summary = projectSummary(project.id, tasks);
+              return <li className="flex flex-wrap items-center justify-between gap-3 py-4" key={project.id}>
+              <div className="min-w-0"><h3 className="font-semibold text-stone-950">{project.name}</h3><p className="mt-1 text-sm text-stone-600">{project.scopeKind === "workspace" ? "Робота" : "Сім’я"}: {project.scopeName} · {taskHorizonLabels[project.horizon]}</p><p className="mt-1 text-xs leading-5 text-stone-500">Задач: {summary.total} · у роботі: {summary.inProgress} · активних: {summary.active} · виконано: {summary.completed}</p></div>
               <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${project.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-stone-100 text-stone-600"}`}>{projectStatusLabel(project)}</span><Link className="inline-flex min-h-9 items-center rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-100" href={`/tasks/list?project=${encodeURIComponent(project.id)}`}>Задачі</Link>{project.status === "active" ? <button className="min-h-9 rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60" disabled={closingId === project.id} onClick={() => void closeProject(project.id)} type="button">{closingId === project.id ? "Закриваємо…" : "Закрити"}</button> : null}</div>
-            </li>)}
+            </li>;
+            })}
           </ul>
         )}
       </section>
