@@ -5,10 +5,11 @@ import { TaskAttachments } from "@/components/task-attachments";
 import { TaskChecklist } from "@/components/task-checklist";
 import { TaskComments } from "@/components/task-comments";
 import { TaskDetailStatus } from "@/components/task-detail-status";
+import { TaskParticipantsEditor } from "@/components/task-participants-editor";
 import { getTaskUserContext } from "@/lib/task-access";
 import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
 import { isLocalTestMode } from "@/lib/test-mode";
-import { getTaskDetail } from "@/lib/tasks";
+import { getTaskDetail, getTaskFormContext } from "@/lib/tasks";
 
 function formatTaskTimestamp(value: string) {
   return new Intl.DateTimeFormat("uk-UA", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(value));
@@ -28,7 +29,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
     );
   }
 
-  const [member, result] = await Promise.all([getTaskUserContext(), getTaskDetail(taskId, true)]);
+  const [member, result, formContext] = await Promise.all([getTaskUserContext(), getTaskDetail(taskId, true), getTaskFormContext()]);
 
   if (!result.task) {
     if (result.error) {
@@ -45,6 +46,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
   }
 
   const task = result.task;
+  const taskSpace = formContext.spaces.find((space) => space.kind === task.scopeKind && space.id === task.scopeId);
   const hasCreatedEvent = result.activityEvents.some((event) => event.eventType === "created");
   const hasCompletedEvent = result.activityEvents.some((event) => event.nextStatus === "completed");
   const hasRejectedEvent = result.activityEvents.some((event) => event.nextStatus === "rejected");
@@ -73,7 +75,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           <div><dt className="text-stone-500">Створив</dt><dd className="mt-1 font-semibold text-stone-800">{task.createdByName}</dd></div>
           <div><dt className="text-stone-500">Строк</dt><dd className="mt-1 font-semibold text-stone-800">{task.dueDate ? formatTaskDate(task.dueDate) : "Не встановлено"}</dd></div>
           {task.projectName ? <div><dt className="text-stone-500">Постійний простір</dt><dd className="mt-1 font-semibold text-stone-800">{task.scopeName}</dd></div> : null}
-          <div className="sm:col-span-2"><dt className="text-stone-500">Учасники</dt><dd className="mt-1 font-semibold text-stone-800">{task.participants.length > 0 ? task.participants.map((participant) => participant.name).join(", ") : "Особиста задача"}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-stone-500">Учасники</dt><dd className="mt-1 font-semibold text-stone-800">{[task.createdByName, ...task.participants.map((participant) => participant.name)].join(", ")}</dd></div>
         </dl>
         <section className="mt-7 border-t border-stone-100 pt-5" aria-labelledby="task-activity-heading">
           <h2 className="text-base font-semibold text-stone-950" id="task-activity-heading">Історія задачі</h2>
@@ -83,6 +85,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           </ol>
           {result.activityError ? <p className="mt-4 rounded-xl bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">{result.activityError}</p> : null}
         </section>
+        <TaskParticipantsEditor availableMembers={taskSpace?.members ?? []} createdByName={task.createdByName} initialParticipants={task.participants} setupError={formContext.error} taskId={task.id} />
         <TaskDetailStatus memberName={member.displayName} postponedUntil={task.postponedUntil} status={task.status} taskId={task.id} />
       </div>
 
