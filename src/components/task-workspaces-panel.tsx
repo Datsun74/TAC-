@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { createClient } from "@/lib/supabase/client";
-import type { TaskWorkspace, TaskWorkspaceMember, TaskWorkspaceRole } from "@/types/task";
+import type { TaskWorkspace, TaskWorkspaceMember, TaskWorkspaceRole, TaskWorkspaceStatus } from "@/types/task";
 
 type Invite = Readonly<{
   code: string;
@@ -25,6 +25,10 @@ function roleLabel(role: TaskWorkspace["role"]) {
   return "Працівник";
 }
 
+function workspaceStatusLabel(status: TaskWorkspaceStatus) {
+  return status === "test" ? "Тестовий режим" : "Активний";
+}
+
 export function TaskWorkspacesPanel({ currentUserId, displayName, testMode, workspaces, workspaceMembers }: TaskWorkspacesPanelProps) {
   const router = useRouter();
   const [workspaceName, setWorkspaceName] = useState("");
@@ -33,7 +37,9 @@ export function TaskWorkspacesPanel({ currentUserId, displayName, testMode, work
   const [creatingInviteFor, setCreatingInviteFor] = useState<string | null>(null);
   const [invites, setInvites] = useState<Record<string, Invite>>({});
   const [changedRoles, setChangedRoles] = useState<Record<string, TaskWorkspaceRole>>({});
+  const [changedStatuses, setChangedStatuses] = useState<Record<string, TaskWorkspaceStatus>>({});
   const [changingRoleFor, setChangingRoleFor] = useState<string | null>(null);
+  const [changingStatusFor, setChangingStatusFor] = useState<string | null>(null);
   const [error, setError] = useState("");
   const members = workspaceMembers.map((member) => ({ ...member, role: changedRoles[member.workspaceId + member.id] ?? member.role }));
 
@@ -118,25 +124,56 @@ export function TaskWorkspacesPanel({ currentUserId, displayName, testMode, work
     setChangingRoleFor(null);
   }
 
+  async function changeWorkspaceStatus(workspace: TaskWorkspace, nextStatus: TaskWorkspaceStatus) {
+    if (testMode) {
+      setError("Зміна режиму простору потребує підключеного Supabase.");
+      return;
+    }
+
+    setError("");
+    setChangingStatusFor(workspace.id);
+    const { error: rpcError } = await createClient().rpc("set_task_workspace_status", {
+      target_workspace_id: workspace.id,
+      next_status: nextStatus,
+    });
+
+    if (rpcError) {
+      setError("Не вдалося змінити режим простору. Перевірте, чи виконано supabase/task-workspace-status.sql.");
+      setChangingStatusFor(null);
+      return;
+    }
+
+    setChangedStatuses((current) => ({ ...current, [workspace.id]: nextStatus }));
+    setChangingStatusFor(null);
+    router.refresh();
+  }
+
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.8fr)]">
       <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
         <h2 className="text-xl font-semibold tracking-tight text-stone-950">Ваші робочі простори</h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">Робочі задачі та працівники ізольовані від сімейного простору.</p>
+        <p className="mt-2 text-sm leading-6 text-stone-600">Робочі задачі та працівники ізольовані від сімейного простору. Тестовий простір зберігає всі дані, але не пропонується для нових задач і проєктів.</p>
         {workspaces.length === 0 ? (
           <p className="mt-6 rounded-2xl bg-stone-100 px-4 py-4 text-sm leading-6 text-stone-600">Ви ще не належите до жодного робочого простору.</p>
         ) : (
           <ul className="mt-6 divide-y divide-stone-100">
-            {workspaces.map((workspace) => (
+            {workspaces.map((workspace) => {
+              const status = changedStatuses[workspace.id] ?? workspace.status;
+              const canManage = workspace.role === "owner" || workspace.role === "manager";
+
+              return (
               <li className="py-5" key={workspace.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold text-stone-900">{workspace.name}</h3>
                     <p className="mt-1 text-sm text-stone-600">Ви: {workspace.displayName}</p>
                   </div>
-                  <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">{roleLabel(workspace.role)}</span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status === "test" ? "bg-amber-100 text-amber-900" : "bg-emerald-50 text-emerald-800"}`}>{workspaceStatusLabel(status)}</span>
+                    <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">{roleLabel(workspace.role)}</span>
+                  </div>
                 </div>
-                {(workspace.role === "owner" || workspace.role === "manager") ? (
+                {canManage && status === "active" ? (
                   <div className="mt-4">
                     <button className="min-h-10 rounded-full border border-amber-800 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60" disabled={creatingInviteFor === workspace.id} onClick={() => void createInvite(workspace.id)} type="button">
                       {creatingInviteFor === workspace.id ? "Створюємо…" : "Код для працівника"}
@@ -149,6 +186,14 @@ export function TaskWorkspacesPanel({ currentUserId, displayName, testMode, work
                         <button className="mt-3 text-sm font-semibold text-amber-800 underline underline-offset-4 hover:text-amber-950" onClick={() => void copyCode(invites[workspace.id].code)} type="button">Копіювати код</button>
                       </div>
                     ) : null}
+                  </div>
+                ) : null}
+                {workspace.role === "owner" ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button className={`min-h-10 rounded-full border px-4 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${status === "test" ? "border-emerald-700 text-emerald-800 hover:bg-emerald-50" : "border-amber-800 text-amber-900 hover:bg-amber-50"}`} disabled={changingStatusFor === workspace.id} onClick={() => void changeWorkspaceStatus(workspace, status === "test" ? "active" : "test")} type="button">
+                      {changingStatusFor === workspace.id ? "Зберігаємо…" : status === "test" ? "Активувати простір" : "Перевести в тестовий режим"}
+                    </button>
+                    <p className="text-xs leading-5 text-stone-500">{status === "test" ? "Простір збережено; за потреби його можна повернути в роботу." : "Для старих даних доступ збережеться."}</p>
                   </div>
                 ) : null}
                 <div className="mt-5 border-t border-stone-100 pt-4">
@@ -168,7 +213,8 @@ export function TaskWorkspacesPanel({ currentUserId, displayName, testMode, work
                   </ul>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>

@@ -9,7 +9,7 @@ type TaskAppShellProps = Readonly<{
 
 export async function TaskAppShell({ children }: TaskAppShellProps) {
   const context = await getTaskUserContext();
-  const spaceName = context.workspaces[0]?.name ?? "Робочі простори";
+  const spaceName = context.workspaces.find((workspace) => workspace.status === "active")?.name ?? "Робочі простори";
 
   return (
     <AppShell

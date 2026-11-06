@@ -364,8 +364,10 @@ export async function getTaskFormContext(): Promise<Readonly<{
     });
   }
 
-  if (context.workspaces.length > 0) {
-    const workspaceIds = context.workspaces.map((workspace) => workspace.id);
+  const activeWorkspaces = context.workspaces.filter((workspace) => workspace.status === "active");
+
+  if (activeWorkspaces.length > 0) {
+    const workspaceIds = activeWorkspaces.map((workspace) => workspace.id);
     const { data: workspaceMembers, error: workspaceError } = await supabase
       .from("task_workspace_members")
       .select("workspace_id, user_id, display_name")
@@ -377,7 +379,7 @@ export async function getTaskFormContext(): Promise<Readonly<{
       return { currentMember, spaces, projects: [], projectsSetupError: null, error: "Не вдалося завантажити учасників робочого простору." };
     }
 
-    context.workspaces.forEach((workspace) => {
+    activeWorkspaces.forEach((workspace) => {
       spaces.push({
         id: workspace.id,
         kind: "workspace",

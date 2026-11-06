@@ -5,13 +5,20 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedUserId, type FamilyMember } from "@/lib/family-access";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalTestMode } from "@/lib/test-mode";
-import type { TaskWorkspace, TaskWorkspaceMember, TaskWorkspaceRole } from "@/types/task";
+import type { TaskWorkspace, TaskWorkspaceMember, TaskWorkspaceRole, TaskWorkspaceStatus } from "@/types/task";
 
 export type TaskUserContext = Readonly<{
   userId: string;
   displayName: string;
   family: FamilyMember | null;
   workspaces: readonly TaskWorkspace[];
+}>;
+
+type WorkspaceRow = Readonly<{
+  workspace_id: string;
+  display_name: string;
+  role: unknown;
+  task_workspaces: unknown;
 }>;
 
 function workspaceName(value: unknown) {
@@ -28,6 +35,22 @@ function workspaceName(value: unknown) {
 
 function workspaceRole(value: unknown): TaskWorkspaceRole {
   return value === "owner" || value === "manager" ? value : "worker";
+}
+
+function workspaceStatus(value: unknown): TaskWorkspaceStatus {
+  return value === "test" ? "test" : "active";
+}
+
+function workspaceStatusValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return workspaceStatusValue(value[0]);
+  }
+
+  if (value && typeof value === "object") {
+    return (value as { status?: unknown }).status;
+  }
+
+  return undefined;
 }
 
 export async function getTaskUserContext(): Promise<TaskUserContext> {
@@ -52,7 +75,7 @@ export async function getTaskUserContext(): Promise<TaskUserContext> {
   }
 
   const supabase = await createClient();
-  const [{ data: familyMember }, { data: workspaceData }] = await Promise.all([
+  const [{ data: familyMember }, initialWorkspaceResult] = await Promise.all([
     supabase
       .from("family_members")
       .select("display_name, family_id, role, families(name)")
@@ -61,7 +84,7 @@ export async function getTaskUserContext(): Promise<TaskUserContext> {
       .maybeSingle(),
     supabase
       .from("task_workspace_members")
-      .select("workspace_id, display_name, role, task_workspaces(name)")
+      .select("workspace_id, display_name, role, task_workspaces(name, status)")
       .eq("user_id", userId)
       .eq("is_active", true),
   ]);
@@ -77,9 +100,22 @@ export async function getTaskUserContext(): Promise<TaskUserContext> {
     }
     : null;
 
+  // The fallback keeps existing workspaces available until the optional
+  // workspace-status migration has been applied in Supabase.
+  let workspaceData = initialWorkspaceResult.data as WorkspaceRow[] | null;
+  if (initialWorkspaceResult.error) {
+    const { data: legacyWorkspaceData } = await supabase
+      .from("task_workspace_members")
+      .select("workspace_id, display_name, role, task_workspaces(name)")
+      .eq("user_id", userId)
+      .eq("is_active", true);
+    workspaceData = legacyWorkspaceData as WorkspaceRow[] | null;
+  }
+
   const workspaces: TaskWorkspace[] = (workspaceData ?? []).map((workspace) => ({
     id: workspace.workspace_id,
     name: workspaceName(workspace.task_workspaces),
+    status: workspaceStatus(workspaceStatusValue(workspace.task_workspaces)),
     role: workspaceRole(workspace.role),
     displayName: workspace.display_name,
   }));
