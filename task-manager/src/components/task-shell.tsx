@@ -17,6 +17,7 @@ const navigation = [
   { href: "/tasks", label: "Сьогодні", mobileLabel: "Сьогодні", symbol: "⌂" },
   { href: "/tasks/list", label: "Усі задачі", mobileLabel: "Усі", symbol: "≡" },
   { href: "/tasks/board", label: "Дошка", mobileLabel: "Дошка", symbol: "▦" },
+  { href: "/tasks/gantt", label: "Гант", mobileLabel: "Гант", symbol: "▤" },
   { href: "/tasks/add", label: "Нова задача", mobileLabel: "Додати", symbol: "+" },
   { href: "/tasks/history", label: "Історія", mobileLabel: "Історія", symbol: "✓" },
   { href: "/tasks/workspaces", label: "Простори", mobileLabel: "Простори", symbol: "◌" },
@@ -65,8 +66,8 @@ export function TaskShell({ children, displayName, spaceName, testMode }: TaskSh
             })}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link className="hidden max-w-36 truncate rounded-full bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-200 sm:block" href="/tasks/workspaces">
-              {spaceName}
+            <Link aria-label={`Поточний робочий простір: ${spaceName}. Відкрити простори`} className="hidden max-w-56 truncate rounded-full bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-200 sm:block" href="/tasks/workspaces" title={`Робочий простір: ${spaceName}`}>
+              <span className="text-stone-500">Простір: </span>{spaceName}
             </Link>
             <span className="hidden max-w-28 truncate text-sm font-semibold text-stone-700 sm:block">{displayName}</span>
             {testMode ? <span className="rounded-full bg-amber-100 px-3 py-2 text-xs font-bold text-amber-900">Тест</span> : (
@@ -78,11 +79,11 @@ export function TaskShell({ children, displayName, spaceName, testMode }: TaskSh
         </div>
       </header>
 
-      <main className="mx-auto min-h-[calc(100vh-148px)] max-w-6xl px-4 py-8 pb-28 sm:px-6 lg:pb-8">{children}</main>
+      <main className="mx-auto min-h-[calc(100vh-148px)] max-w-6xl px-4 py-8 pb-36 sm:px-6 lg:pb-8">{children}</main>
 
       {signOutError ? <p aria-live="assertive" className="fixed right-4 bottom-24 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-lg lg:bottom-4">{signOutError}</p> : null}
       <nav aria-label="Навігація на телефоні" className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/95 px-1 py-2 shadow-[0_-8px_24px_rgba(28,25,23,0.08)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-7 gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-4 gap-1 sm:grid-cols-8">
           {navigation.map((item) => {
             const isCurrent = pathname === item.href;
             return (

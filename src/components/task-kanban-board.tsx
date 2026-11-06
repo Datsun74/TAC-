@@ -22,6 +22,12 @@ type TaskCardProps = Readonly<{
   onDragStart: (event: DragEvent<HTMLElement>, task: Task) => void;
   onDragEnd: () => void;
 }>;
+type TaskContainerGroup = Readonly<{
+  id: string;
+  label: string;
+  sortOrder: number;
+  tasks: Task[];
+}>;
 
 const columns: readonly TaskStatus[] = ["active", "in_work", "in_progress", "postponed", "completed", "rejected"];
 const orderedHorizons: readonly TaskHorizon[] = ["tactical", "operational", "strategic"];
@@ -64,7 +70,7 @@ function taskContainer(task: Task) {
   return { id: `space-${task.scopeKind}-${task.scopeId}`, label: `Простір · ${task.scopeName}`, sortOrder: 1 };
 }
 
-function taskGroupsForHorizon(tasks: readonly Task[]) {
+function taskGroupsForHorizon(tasks: readonly Task[]): TaskContainerGroup[] {
   const groups = new Map<string, { id: string; label: string; sortOrder: number; tasks: Task[] }>();
   tasks.forEach((task) => {
     const container = taskContainer(task);
@@ -146,7 +152,7 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
+  const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const items = overriddenItems ?? localTasks;
@@ -220,39 +226,30 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
     setMovingTaskId(null);
   }
 
-  function allowDrop(event: DragEvent<HTMLElement>, status: TaskStatus) {
-    if (!draggedTaskId) return;
+  function allowDrop(event: DragEvent<HTMLElement>, status: TaskStatus, targetKey: string, acceptedTaskIds: readonly string[]) {
+    if (!draggedTaskId || !acceptedTaskIds.includes(draggedTaskId)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    setDropTargetStatus(status);
+    setDropTargetKey(targetKey);
   }
 
-  function dropTask(event: DragEvent<HTMLElement>, status: TaskStatus) {
+  function dropTask(event: DragEvent<HTMLElement>, status: TaskStatus, acceptedTaskIds: readonly string[]) {
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId;
     setDraggedTaskId(null);
-    setDropTargetStatus(null);
-    if (taskId) void moveTask(taskId, status);
+    setDropTargetKey(null);
+    if (taskId && acceptedTaskIds.includes(taskId)) void moveTask(taskId, status);
   }
 
-  function renderColumn(status: TaskStatus) {
-    const columnTasks = visibleTasks.filter((task) => task.status === status);
-    const isDropTarget = dropTargetStatus === status && draggedTaskId !== null;
+  function renderStatusColumn(status: TaskStatus, group: TaskContainerGroup, horizon: TaskHorizon) {
+    const columnTasks = group.tasks.filter((task) => task.status === status);
+    const targetKey = `${horizon}-${group.id}-${status}`;
+    const isDropTarget = dropTargetKey === targetKey && draggedTaskId !== null;
 
     return (
-      <section className={`${columnStyle(status)} ${isDropTarget ? "ring-2 ring-amber-700 ring-offset-2" : ""} min-w-0 rounded-2xl border p-3 transition-shadow`} key={status} onDragOver={(event) => allowDrop(event, status)} onDrop={(event) => dropTask(event, status)}>
-        <div className="flex items-center justify-between gap-2"><h2 className="min-w-0 text-sm font-semibold leading-5 text-stone-950">{taskStatusLabels[status]}</h2><span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-stone-700">{columnTasks.length}</span></div>
-        {columnTasks.length > 0 ? <div className="mt-3 divide-y-2 divide-stone-300 border-t-2 border-stone-300">{orderedHorizons.map((horizon) => {
-          const groups = taskGroupsForHorizon(columnTasks.filter((task) => task.horizon === horizon));
-          if (groups.length === 0) return null;
-          return <section className="py-3 first:pt-2" key={horizon}>
-            <h3 className="flex items-center gap-2 text-[11px] font-bold tracking-wide text-stone-700 uppercase"><span className="h-px flex-1 bg-stone-300" />{taskHorizonLabels[horizon]}<span className="h-px flex-1 bg-stone-300" /></h3>
-            <div className="mt-2 space-y-3">{groups.map((group) => <div className="space-y-2" key={group.id}>
-              <p className={`truncate px-1 text-[11px] font-semibold leading-4 ${group.sortOrder === 0 ? "text-amber-900" : "text-stone-600"}`} title={group.label}>{group.sortOrder === 0 ? "Проєкт · " : "Простір · "}{group.label.replace(/^(Проєкт|Простір) · /, "")}</p>
-              <div className="space-y-2">{group.tasks.map((task) => <TaskCard isMoving={movingTaskId === task.id} key={task.id} onDragEnd={() => { setDraggedTaskId(null); setDropTargetStatus(null); }} onDragStart={startDragging} task={task} testMode={testMode} />)}</div>
-            </div>)}</div>
-          </section>;
-        })}</div> : <p className="mt-3 rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Перетягніть сюди задачу.</p>}
+      <section className={`${columnStyle(status)} ${isDropTarget ? "ring-2 ring-amber-700 ring-offset-1" : ""} min-w-0 rounded-xl border p-2 transition-shadow`} key={status} onDragOver={(event) => allowDrop(event, status, targetKey, group.tasks.map((task) => task.id))} onDrop={(event) => dropTask(event, status, group.tasks.map((task) => task.id))}>
+        <div className="flex items-center justify-between gap-1"><h3 className="min-w-0 text-xs font-semibold leading-4 text-stone-950">{taskStatusLabels[status]}</h3><span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-stone-700">{columnTasks.length}</span></div>
+        {columnTasks.length > 0 ? <div className="mt-2 space-y-2">{columnTasks.map((task) => <TaskCard isMoving={movingTaskId === task.id} key={task.id} onDragEnd={() => { setDraggedTaskId(null); setDropTargetKey(null); }} onDragStart={startDragging} task={task} testMode={testMode} />)}</div> : <p className="mt-2 rounded-lg bg-white/70 px-2 py-2 text-[11px] leading-4 text-stone-500">Перетягніть сюди</p>}
       </section>
     );
   }
@@ -264,7 +261,7 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
           <label className="min-w-[13rem] flex-1 sm:max-w-sm"><span className="sr-only">Пошук задач на канбані</span><input className="min-h-10 w-full rounded-full border border-stone-300 bg-white px-4 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-amber-700 focus:ring-2 focus:ring-amber-100" onChange={(event) => setSearch(event.target.value)} placeholder="Пошук задач, проєктів, людей…" type="search" value={search} /></label>
           <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedPeople.length + selectedProjectIds.length + selectedStatuses.length + (search.trim() ? 1 : 0)})` : ""}</button>
           {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={clearFilters} type="button">Очистити</button> : null}
-          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Перетягніть картку до іншої колонки, щоб змінити її стан. У кожному стані задачі поділено лініями: тактичні → оперативні → стратегічні. Усередині рівня проєкти йдуть перед просторами.</p>
+          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Кожен рівень планування показано окремим рядом. Усередині нього кожен проєкт має власний ряд; після проєктів ідуть постійні простори. Перетягуйте картку лише в інший стан того самого ряду.</p>
         </div>
 
         {filtersOpen ? (
@@ -315,7 +312,18 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
           <h2 className="text-lg font-semibold text-stone-900">{filtersApplied ? "За обраними фільтрами задач немає." : "Задач поки немає."}</h2>
           {filtersApplied ? <button className="mt-5 min-h-11 rounded-full bg-amber-800 px-5 text-sm font-semibold text-white hover:bg-amber-900" onClick={clearFilters} type="button">Показати всі задачі</button> : <Link className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-amber-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-900" href="/tasks/add">Створити задачу</Link>}
         </section>
-      ) : <><div className="mt-6 space-y-5 lg:hidden">{columns.map(renderColumn)}</div><div className="mt-6 hidden lg:grid lg:grid-cols-6 lg:gap-3">{columns.map(renderColumn)}</div></>}
+      ) : <div className="mt-6 space-y-8">{orderedHorizons.map((horizon) => {
+        const groups = taskGroupsForHorizon(visibleTasks.filter((task) => task.horizon === horizon));
+        if (groups.length === 0) return null;
+
+        return <section className="border-t-4 border-stone-300 pt-4 first:border-t-0 first:pt-0" key={horizon}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 px-1"><h2 className="text-lg font-bold text-stone-950">{taskHorizonLabels[horizon]} задачі</h2><p className="text-xs text-stone-500">{groups.reduce((count, group) => count + group.tasks.length, 0)} задач</p></div>
+          <div className="mt-3 space-y-4">{groups.map((group) => <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm" key={group.id}>
+            <div className={`flex items-center justify-between gap-3 border-b px-3 py-2 ${group.sortOrder === 0 ? "border-amber-200 bg-amber-50" : "border-stone-200 bg-stone-50"}`}><h3 className={`min-w-0 truncate text-sm font-bold ${group.sortOrder === 0 ? "text-amber-950" : "text-stone-800"}`} title={group.label}>{group.sortOrder === 0 ? "Проєкт · " : "Простір · "}{group.label.replace(/^(Проєкт|Простір) · /, "")}</h3><span className="shrink-0 text-xs text-stone-500">{group.tasks.length}</span></div>
+            <div className="grid grid-cols-2 gap-2 p-2 md:grid-cols-3 xl:grid-cols-6">{columns.map((status) => renderStatusColumn(status, group, horizon))}</div>
+          </section>)}</div>
+        </section>;
+      })}</div>}
     </>
   );
 }
