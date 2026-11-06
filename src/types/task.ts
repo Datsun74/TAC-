@@ -26,6 +26,9 @@ export type Task = Readonly<{
   plannedStartDate: string | null;
   dueDate: string | null;
   actualStartedAt: string | null;
+  progressPercent: number;
+  executionNote: string | null;
+  executionUpdatedAt: string | null;
   status: TaskStatus;
   postponedUntil: string | null;
   createdByName: string;

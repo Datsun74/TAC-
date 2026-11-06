@@ -119,6 +119,7 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
     const selectedParticipants = selectedSpace.members.filter((member) => values.participantIds.includes(member.id));
     const task: Task = {
       id: window.crypto.randomUUID(), title: values.title.trim(), goal: values.goal.trim() || null, area: values.area, horizon: values.horizon, plannedStartDate: values.plannedStartDate || null, dueDate: values.dueDate || null, actualStartedAt: null,
+      progressPercent: 0, executionNote: null, executionUpdatedAt: null,
       status: "active", postponedUntil: null, createdByName: currentMember.name, createdAt: new Date().toISOString(), completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null,
       participants: selectedParticipants, scopeKind: selectedSpace.kind, scopeId: selectedSpace.id, scopeName: selectedSpace.name,
       projectId: values.containerKind === "project" ? selectedProject?.id ?? null : null,

@@ -5,11 +5,12 @@ import { TaskAttachments } from "@/components/task-attachments";
 import { TaskChecklist } from "@/components/task-checklist";
 import { TaskComments } from "@/components/task-comments";
 import { TaskDetailStatus } from "@/components/task-detail-status";
+import { TaskExecutionProgress } from "@/components/task-execution-progress";
 import { TaskParticipantsEditor } from "@/components/task-participants-editor";
 import { getTaskUserContext } from "@/lib/task-access";
 import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
 import { isLocalTestMode } from "@/lib/test-mode";
-import { getTaskDetail, getTaskFormContext } from "@/lib/tasks";
+import { getTaskDetail, getTaskExecutionSetupError, getTaskFormContext } from "@/lib/tasks";
 
 function formatTaskTimestamp(value: string) {
   return new Intl.DateTimeFormat("uk-UA", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(value));
@@ -29,7 +30,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
     );
   }
 
-  const [member, result, formContext] = await Promise.all([getTaskUserContext(), getTaskDetail(taskId, true), getTaskFormContext()]);
+  const [member, result, formContext, executionSetupError] = await Promise.all([getTaskUserContext(), getTaskDetail(taskId, true), getTaskFormContext(), getTaskExecutionSetupError()]);
 
   if (!result.task) {
     if (result.error) {
@@ -78,6 +79,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           {task.projectName ? <div><dt className="text-stone-500">Постійний простір</dt><dd className="mt-1 font-semibold text-stone-800">{task.scopeName}</dd></div> : null}
           <div className="sm:col-span-2"><dt className="text-stone-500">Учасники</dt><dd className="mt-1 font-semibold text-stone-800">{[task.createdByName, ...task.participants.map((participant) => participant.name)].join(", ")}</dd></div>
         </dl>
+        <TaskExecutionProgress setupError={executionSetupError} task={task} />
         <section className="mt-7 border-t border-stone-100 pt-5" aria-labelledby="task-activity-heading">
           <h2 className="text-base font-semibold text-stone-950" id="task-activity-heading">Історія задачі</h2>
           <ol className="mt-3 space-y-3">
