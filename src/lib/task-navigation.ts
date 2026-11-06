@@ -2,6 +2,7 @@ import type { NavigationItem } from "@/types/navigation";
 
 export const taskNavigationItems: NavigationItem[] = [
   { label: "Сьогодні", mobileLabel: "Сьогодні", href: "/tasks" },
+  { label: "Огляд", mobileLabel: "Огляд", href: "/tasks/review" },
   { label: "Усі задачі", mobileLabel: "Усі", href: "/tasks/list" },
   { label: "Дошка", mobileLabel: "Дошка", href: "/tasks/board" },
   { label: "Гант", mobileLabel: "Гант", href: "/tasks/gantt" },
