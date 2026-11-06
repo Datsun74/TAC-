@@ -17,6 +17,13 @@ type GanttRow = Readonly<{
   actual: DateRange | null;
   emphasized?: boolean;
 }>;
+type PlanningConflict = Readonly<{
+  id: string;
+  independentTask: Task;
+  projectTask: Task;
+  sharedPeople: readonly string[];
+  overlap: DateRange;
+}>;
 
 const monthFormatter = new Intl.DateTimeFormat("uk-UA", { month: "short", year: "2-digit" });
 const horizonOrder = { tactical: 0, operational: 1, strategic: 2 } as const;
@@ -67,6 +74,51 @@ function aggregateRange(ranges: readonly (DateRange | null)[]): DateRange | null
     start: present.reduce((first, range) => range.start < first ? range.start : first, present[0].start),
     end: present.reduce((last, range) => range.end > last ? range.end : last, present[0].end),
   };
+}
+
+function rangesOverlap(first: DateRange, second: DateRange): DateRange | null {
+  const start = first.start > second.start ? first.start : second.start;
+  const end = first.end < second.end ? first.end : second.end;
+  return start <= end ? { start, end } : null;
+}
+
+function sharedParticipantNames(first: Task, second: Task) {
+  const secondParticipantIds = new Set(second.participants.map((participant) => participant.id));
+  const sharedNames = first.participants
+    .filter((participant) => secondParticipantIds.has(participant.id))
+    .map((participant) => participant.name);
+
+  if (sharedNames.length > 0) return sharedNames;
+  return first.createdByName === second.createdByName ? [first.createdByName] : [];
+}
+
+function getPlanningConflicts(tasks: readonly Task[], view: GanttRange) {
+  const independentTasks = tasks.filter((task) => !task.projectId);
+  const projectTasks = tasks.filter((task) => task.projectId);
+  const conflicts: PlanningConflict[] = [];
+
+  independentTasks.forEach((independentTask) => {
+    const independentRange = taskPlannedRange(independentTask);
+    if (!independentRange || !visibleRange(independentRange, view)) return;
+
+    projectTasks.forEach((projectTask) => {
+      const projectRange = taskPlannedRange(projectTask);
+      if (!projectRange || !visibleRange(projectRange, view)) return;
+      const overlap = rangesOverlap(independentRange, projectRange);
+      const sharedPeople = overlap ? sharedParticipantNames(independentTask, projectTask) : [];
+      if (!overlap || sharedPeople.length === 0) return;
+
+      conflicts.push({
+        id: `${independentTask.id}-${projectTask.id}`,
+        independentTask,
+        projectTask,
+        sharedPeople,
+        overlap,
+      });
+    });
+  });
+
+  return conflicts.sort((first, second) => first.overlap.start.localeCompare(second.overlap.start));
 }
 
 function buildTaskRow(task: Task): GanttRow {
@@ -150,6 +202,7 @@ export function TaskGantt({ setupError, tasks }: Readonly<{ setupError: string |
     return [...groups.entries()].map(([id, groupTasks]) => ({ id, name: groupTasks[0].projectName as string, tasks: groupTasks }));
   }, [visibleTasks]);
   const independentGroups = useMemo(() => (["work", "family", "personal"] as const).map((area) => ({ area, tasks: visibleTasks.filter((task) => !task.projectId && task.area === area) })).filter((group) => group.tasks.length > 0), [visibleTasks]);
+  const planningConflicts = useMemo(() => getPlanningConflicts(visibleTasks, view), [view, visibleTasks]);
 
   const resetToToday = () => setAnchorMonth(new Date(today.getFullYear(), today.getMonth(), 1, 12));
 
@@ -166,6 +219,14 @@ export function TaskGantt({ setupError, tasks }: Readonly<{ setupError: string |
     </section>
 
     {setupError ? <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"><strong>Щоб діаграма показувала обидві смуги:</strong> {setupError}</section> : null}
+
+    {planningConflicts.length > 0 ? <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3" aria-label="Накладки планів">
+      <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-sm font-bold text-amber-950">Накладки планів</h2><p className="text-xs text-amber-900">Спільний учасник має дві задачі в один період.</p></div>
+      <ul className="mt-2 divide-y divide-amber-200/80">{planningConflicts.slice(0, 5).map((conflict) => <li className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 text-xs leading-5 text-amber-950" key={conflict.id}>
+        <Link className="font-semibold hover:underline" href={`/tasks/${conflict.independentTask.id}`}>{conflict.independentTask.title}</Link><span className="text-amber-700">↔</span><Link className="font-semibold hover:underline" href={`/tasks/${conflict.projectTask.id}`}>{conflict.projectTask.title}</Link><span className="text-amber-800">· {conflict.projectTask.projectName}</span><span className="text-amber-800">· {conflict.sharedPeople.join(", ")}</span><span className="text-amber-800">· {formatShortDate(conflict.overlap.start)} — {formatShortDate(conflict.overlap.end)}</span>
+      </li>)}</ul>
+      {planningConflicts.length > 5 ? <p className="mt-2 text-xs text-amber-900">Ще накладок: {planningConflicts.length - 5}.</p> : null}
+    </section> : null}
 
     {visibleTasks.length === 0 ? <section className="mt-6 rounded-3xl border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center"><h2 className="text-lg font-semibold text-stone-900">Немає задач для діаграми.</h2><p className="mt-2 text-sm text-stone-600">Створіть задачу з бажаною датою — вона з’явиться на шкалі.</p><Link className="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900" href="/tasks/add">Нова задача</Link></section> : <section className="mt-6 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
       <div className="grid grid-cols-[minmax(8.5rem,1.05fr)_minmax(11rem,2.95fr)] gap-3 border-b border-stone-200 bg-stone-50 px-3 py-2 sm:grid-cols-[minmax(14rem,1.05fr)_minmax(20rem,2.95fr)]"><p className="text-[10px] font-bold tracking-wide text-stone-500 uppercase">Проєкт / задача</p><TimelineHeader view={view} /></div>
