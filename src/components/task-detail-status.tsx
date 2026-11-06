@@ -8,6 +8,7 @@ import { taskStatusLabels } from "@/lib/task-options";
 import type { TaskStatus } from "@/types/task";
 
 type TaskDetailStatusProps = Readonly<{
+  actualStartedAt: string | null;
   memberName: string;
   postponedUntil: string | null;
   status: TaskStatus;
@@ -33,15 +34,16 @@ function oneMonthFromNow() {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function updateValues(status: TaskStatus, memberName: string, postponedUntil?: string) {
+function updateValues(status: TaskStatus, memberName: string, actualStartedAt: string | null, postponedUntil?: string) {
   const changedAt = new Date().toISOString();
-  if (status === "completed") return { status, postponed_until: null, completed_by: memberName, completed_at: changedAt, rejected_by: null, rejected_at: null };
-  if (status === "rejected") return { status, postponed_until: null, completed_by: null, completed_at: null, rejected_by: memberName, rejected_at: changedAt };
-  if (status === "postponed") return { status, postponed_until: postponedUntil ?? oneMonthFromNow(), completed_by: null, completed_at: null, rejected_by: null, rejected_at: null };
-  return { status, postponed_until: null, completed_by: null, completed_at: null, rejected_by: null, rejected_at: null };
+  const actualStart = actualStartedAt ?? ((status === "in_work" || status === "in_progress" || status === "completed") ? changedAt : null);
+  if (status === "completed") return { status, postponed_until: null, completed_by: memberName, completed_at: changedAt, rejected_by: null, rejected_at: null, actual_started_at: actualStart };
+  if (status === "rejected") return { status, postponed_until: null, completed_by: null, completed_at: null, rejected_by: memberName, rejected_at: changedAt, actual_started_at: actualStart };
+  if (status === "postponed") return { status, postponed_until: postponedUntil ?? oneMonthFromNow(), completed_by: null, completed_at: null, rejected_by: null, rejected_at: null, actual_started_at: actualStart };
+  return { status, postponed_until: null, completed_by: null, completed_at: null, rejected_by: null, rejected_at: null, actual_started_at: actualStart };
 }
 
-export function TaskDetailStatus({ memberName, postponedUntil, status, taskId }: TaskDetailStatusProps) {
+export function TaskDetailStatus({ actualStartedAt, memberName, postponedUntil, status, taskId }: TaskDetailStatusProps) {
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isPostponing, setIsPostponing] = useState(false);
@@ -49,14 +51,14 @@ export function TaskDetailStatus({ memberName, postponedUntil, status, taskId }:
   const [error, setError] = useState("");
 
   async function changeStatus(nextStatus: TaskStatus, date?: string) {
-    const values = updateValues(nextStatus, memberName, date);
+    const values = updateValues(nextStatus, memberName, actualStartedAt, date);
     setError("");
     setIsUpdating(true);
     const supabase = createClient();
     const { error: updateError } = await supabase.from("tasks").update(values).eq("id", taskId);
 
     if (updateError) {
-      setError("Не вдалося змінити стан задачі. Оновіть сторінку й спробуйте ще раз.");
+      setError(updateError.code === "42703" ? "Виконайте supabase/task-gantt.sql у Supabase SQL Editor, а потім повторіть зміну стану." : "Не вдалося змінити стан задачі. Оновіть сторінку й спробуйте ще раз.");
       setIsUpdating(false);
       return;
     }

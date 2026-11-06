@@ -22,7 +22,9 @@ function exampleTasks(): Task[] {
       goal: "Зібрати листя біля гаража та винести гілки.",
       area: "family",
       horizon: "tactical",
+      plannedStartDate: dateOffset(-2),
       dueDate: dateOffset(0),
+      actualStartedAt: createdAt,
       status: "in_progress",
       postponedUntil: null,
       createdByName: "Сергій (тест)",
@@ -44,7 +46,9 @@ function exampleTasks(): Task[] {
       goal: "Вибрати дату й оформити реєстрацію.",
       area: "personal",
       horizon: "operational",
+      plannedStartDate: dateOffset(1),
       dueDate: dateOffset(3),
+      actualStartedAt: null,
       status: "active",
       postponedUntil: null,
       createdByName: "Сергій (тест)",
@@ -66,7 +70,9 @@ function exampleTasks(): Task[] {
       goal: "Зібрати ціни на деталі та передати майстру.",
       area: "work",
       horizon: "tactical",
+      plannedStartDate: dateOffset(2),
       dueDate: dateOffset(7),
+      actualStartedAt: null,
       status: "active",
       postponedUntil: null,
       createdByName: "Сергій (тест)",
@@ -110,7 +116,9 @@ function toTask(value: unknown): Task | null {
     !isTaskArea(task.area) ||
     typeof task.horizon !== "string" ||
     !isTaskHorizon(task.horizon) ||
+    (typeof task.plannedStartDate !== "string" && task.plannedStartDate !== null && task.plannedStartDate !== undefined) ||
     (typeof task.dueDate !== "string" && task.dueDate !== null) ||
+    (typeof task.actualStartedAt !== "string" && task.actualStartedAt !== null && task.actualStartedAt !== undefined) ||
     typeof task.status !== "string" ||
     !isTaskStatus(task.status) ||
     (typeof task.postponedUntil !== "string" && task.postponedUntil !== null) ||
@@ -136,7 +144,9 @@ function toTask(value: unknown): Task | null {
     goal: task.goal,
     area: task.area,
     horizon: task.horizon,
+    plannedStartDate: typeof task.plannedStartDate === "string" ? task.plannedStartDate : null,
     dueDate: task.dueDate,
+    actualStartedAt: typeof task.actualStartedAt === "string" ? task.actualStartedAt : null,
     status: task.status,
     postponedUntil: task.postponedUntil,
     createdByName: task.createdByName,

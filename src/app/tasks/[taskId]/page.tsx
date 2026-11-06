@@ -73,7 +73,8 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
         {task.goal ? <p className="mt-5 whitespace-pre-wrap leading-7 text-stone-700">{task.goal}</p> : <p className="mt-5 text-stone-500">Кінцеву мету не вказано.</p>}
         <dl className="mt-7 grid gap-5 border-t border-stone-100 pt-5 text-sm sm:grid-cols-2">
           <div><dt className="text-stone-500">Створив</dt><dd className="mt-1 font-semibold text-stone-800">{task.createdByName}</dd></div>
-          <div><dt className="text-stone-500">Строк</dt><dd className="mt-1 font-semibold text-stone-800">{task.dueDate ? formatTaskDate(task.dueDate) : "Не встановлено"}</dd></div>
+          <div><dt className="text-stone-500">План</dt><dd className="mt-1 font-semibold text-stone-800">{task.plannedStartDate ? formatTaskDate(task.plannedStartDate) : "Старт не встановлено"} — {task.dueDate ? formatTaskDate(task.dueDate) : "завершення не встановлено"}</dd></div>
+          {task.actualStartedAt ? <div><dt className="text-stone-500">Фактичний старт</dt><dd className="mt-1 font-semibold text-stone-800">{formatTaskTimestamp(task.actualStartedAt)}</dd></div> : null}
           {task.projectName ? <div><dt className="text-stone-500">Постійний простір</dt><dd className="mt-1 font-semibold text-stone-800">{task.scopeName}</dd></div> : null}
           <div className="sm:col-span-2"><dt className="text-stone-500">Учасники</dt><dd className="mt-1 font-semibold text-stone-800">{[task.createdByName, ...task.participants.map((participant) => participant.name)].join(", ")}</dd></div>
         </dl>
@@ -86,7 +87,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           {result.activityError ? <p className="mt-4 rounded-xl bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">{result.activityError}</p> : null}
         </section>
         <TaskParticipantsEditor availableMembers={taskSpace?.members ?? []} createdByName={task.createdByName} initialParticipants={task.participants} setupError={formContext.error} taskId={task.id} />
-        <TaskDetailStatus memberName={member.displayName} postponedUntil={task.postponedUntil} status={task.status} taskId={task.id} />
+        <TaskDetailStatus actualStartedAt={task.actualStartedAt} memberName={member.displayName} postponedUntil={task.postponedUntil} status={task.status} taskId={task.id} />
       </div>
 
       <TaskChecklist

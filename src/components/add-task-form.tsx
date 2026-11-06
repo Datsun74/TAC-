@@ -15,6 +15,7 @@ type FormValues = {
   goal: string;
   area: TaskArea;
   horizon: TaskHorizon;
+  plannedStartDate: string;
   dueDate: string;
   containerKind: ContainerKind;
   spaceId: string;
@@ -22,7 +23,7 @@ type FormValues = {
   participantIds: string[];
 };
 
-type FormErrors = Partial<Pick<FormValues, "title" | "goal">>;
+type FormErrors = Partial<Pick<FormValues, "title" | "goal" | "plannedStartDate" | "dueDate">>;
 type DatabaseError = Readonly<{ code?: string; message?: string }>;
 
 type AddTaskFormProps = Readonly<{
@@ -34,13 +35,14 @@ type AddTaskFormProps = Readonly<{
 }>;
 
 const initialValues: FormValues = {
-  title: "", goal: "", area: "family", horizon: "tactical", dueDate: "", containerKind: "space", spaceId: "", projectId: "", participantIds: [],
+  title: "", goal: "", area: "family", horizon: "tactical", plannedStartDate: "", dueDate: "", containerKind: "space", spaceId: "", projectId: "", participantIds: [],
 };
 
 function validate(values: FormValues): FormErrors {
   const errors: FormErrors = {};
   if (values.title.trim().length < 2) errors.title = "Опишіть задачу щонайменше двома символами.";
   if (values.goal.trim().length > 5000) errors.goal = "Кінцева мета має містити не більш як 5 000 символів.";
+  if (values.plannedStartDate && values.dueDate && values.plannedStartDate > values.dueDate) errors.plannedStartDate = "Плановий старт не може бути пізніше планового завершення.";
   return errors;
 }
 
@@ -51,6 +53,7 @@ function saveErrorMessage(error: DatabaseError | null, isProjectTask: boolean) {
       : "Для збереження задач виконайте файл supabase/task-create-reliability.sql у Supabase SQL Editor, а потім повторіть спробу.";
   }
   if (error?.code === "42501") return "Supabase не підтвердив право на створення задачі. Оновіть сторінку, увійдіть знову й повторіть спробу.";
+  if (error?.code === "42703") return "Для планових строків виконайте файл supabase/task-gantt.sql у Supabase SQL Editor, а потім повторіть спробу.";
   if (error?.code === "23514" || error?.code === "23502") return "Не вдалося зберегти дані задачі. Перевірте назву, напрям, рівень планування та вибраний простір або проєкт.";
   return "Не вдалося зберегти задачу. Спробуйте ще раз після оновлення сторінки.";
 }
@@ -115,7 +118,7 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
 
     const selectedParticipants = selectedSpace.members.filter((member) => values.participantIds.includes(member.id));
     const task: Task = {
-      id: window.crypto.randomUUID(), title: values.title.trim(), goal: values.goal.trim() || null, area: values.area, horizon: values.horizon, dueDate: values.dueDate || null,
+      id: window.crypto.randomUUID(), title: values.title.trim(), goal: values.goal.trim() || null, area: values.area, horizon: values.horizon, plannedStartDate: values.plannedStartDate || null, dueDate: values.dueDate || null, actualStartedAt: null,
       status: "active", postponedUntil: null, createdByName: currentMember.name, createdAt: new Date().toISOString(), completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null,
       participants: selectedParticipants, scopeKind: selectedSpace.kind, scopeId: selectedSpace.id, scopeName: selectedSpace.name,
       projectId: values.containerKind === "project" ? selectedProject?.id ?? null : null,
@@ -148,6 +151,18 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
       return;
     }
     if (typeof createdTaskId === "string") {
+      if (task.plannedStartDate) {
+        const { error: timelineError } = await supabase
+          .from("tasks")
+          .update({ planned_start_date: task.plannedStartDate })
+          .eq("id", createdTaskId);
+
+        if (timelineError) {
+          setSubmissionError("Задачу створено, але плановий старт не збережено. Виконайте supabase/task-gantt.sql, відкрийте задачу й вкажіть старт у редагуванні.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
       await supabase.from("task_activity_events").insert({
         task_id: createdTaskId,
         event_type: "created",
@@ -201,7 +216,11 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
           <div><label className="block text-sm font-semibold text-stone-900" htmlFor="task-horizon">Рівень планування</label><select className={fieldClass} id="task-horizon" onChange={(event) => updateValue("horizon", event.target.value as TaskHorizon)} value={values.horizon}>{taskHorizonOptions.map((option) => <option key={option.value} value={option.value}>{option.label} — {option.hint}</option>)}</select></div>
         </div>
 
-        <div className="max-w-sm"><label className="block text-sm font-semibold text-stone-900" htmlFor="task-due-date">Бажана дата</label><input className={fieldClass} id="task-due-date" onChange={(event) => updateValue("dueDate", event.target.value)} type="date" value={values.dueDate} /><p className="mt-1 text-sm text-stone-500">Згодом цю дату можна буде синхронізувати з календарем.</p></div>
+        <div className="grid max-w-2xl gap-6 sm:grid-cols-2">
+          <div><label className="block text-sm font-semibold text-stone-900" htmlFor="task-planned-start-date">Плановий старт <span className="font-normal text-stone-500">(для Ганта)</span></label><input className={fieldClass} id="task-planned-start-date" onChange={(event) => updateValue("plannedStartDate", event.target.value)} type="date" value={values.plannedStartDate} /></div>
+          <div><label className="block text-sm font-semibold text-stone-900" htmlFor="task-due-date">Планове завершення</label><input className={fieldClass} id="task-due-date" onChange={(event) => updateValue("dueDate", event.target.value)} type="date" value={values.dueDate} /><p className="mt-1 text-sm text-stone-500">Раніше це поле називалося «Бажана дата»; воно є плановим завершенням.</p></div>
+        </div>
+        {errors.plannedStartDate ? <p className="-mt-3 text-sm font-medium text-red-700" role="alert">{errors.plannedStartDate}</p> : null}
 
         <fieldset>
           <legend className="text-sm font-semibold text-stone-900">Учасники</legend>

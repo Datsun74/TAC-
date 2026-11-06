@@ -96,7 +96,7 @@ function taskWithStatus(task: Task, status: TaskStatus, memberName: string): Tas
   const changedAt = new Date().toISOString();
 
   if (status === "completed") {
-    return { ...task, status, postponedUntil: null, completedBy: memberName, completedAt: changedAt, rejectedBy: null, rejectedAt: null };
+    return { ...task, status, postponedUntil: null, completedBy: memberName, completedAt: changedAt, rejectedBy: null, rejectedAt: null, actualStartedAt: task.actualStartedAt ?? changedAt };
   }
 
   if (status === "rejected") {
@@ -107,7 +107,7 @@ function taskWithStatus(task: Task, status: TaskStatus, memberName: string): Tas
     return { ...task, status, postponedUntil: task.postponedUntil ?? oneMonthFromNow(), completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null };
   }
 
-  return { ...task, status, postponedUntil: null, completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null };
+  return { ...task, status, postponedUntil: null, completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null, actualStartedAt: task.actualStartedAt ?? ((status === "in_work" || status === "in_progress") ? changedAt : null) };
 }
 
 function taskUpdate(task: Task) {
@@ -116,6 +116,7 @@ function taskUpdate(task: Task) {
     postponed_until: task.postponedUntil,
     completed_by: task.completedBy,
     completed_at: task.completedAt,
+    actual_started_at: task.actualStartedAt,
     rejected_by: task.rejectedBy,
     rejected_at: task.rejectedAt,
   };

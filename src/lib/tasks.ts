@@ -13,7 +13,9 @@ type TaskRow = {
   goal: string | null;
   area: Task["area"];
   horizon: Task["horizon"];
+  planned_start_date?: string | null;
   due_date: string | null;
+  actual_started_at?: string | null;
   status: TaskStatus;
   postponed_until: string | null;
   created_by_name: string;
@@ -85,7 +87,9 @@ function mapTask(row: TaskRow): Task {
     goal: row.goal,
     area: row.area,
     horizon: row.horizon,
+    plannedStartDate: row.planned_start_date ?? null,
     dueDate: row.due_date,
+    actualStartedAt: row.actual_started_at ?? null,
     status: row.status,
     postponedUntil: row.postponed_until,
     createdByName: row.created_by_name,
@@ -103,7 +107,7 @@ function mapTask(row: TaskRow): Task {
   };
 }
 
-const taskFields = "id, title, goal, area, horizon, due_date, status, postponed_until, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, project_id, families(name), task_workspaces(name), task_projects(name), task_participants(member_user_id, member_name)";
+const taskFields = "id, title, goal, area, horizon, planned_start_date, due_date, actual_started_at, status, postponed_until, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, project_id, families(name), task_workspaces(name), task_projects(name), task_participants(member_user_id, member_name)";
 const legacyTaskFields = "id, title, goal, area, horizon, due_date, status, postponed_until, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, families(name), task_workspaces(name), task_participants(member_user_id, member_name)";
 
 function shouldUseLegacyTaskFields(error: { code?: string; message?: string } | null) {
@@ -141,6 +145,17 @@ export async function getTasks(statuses: readonly TaskStatus[]): Promise<TasksRe
   }
 
   return { tasks: ((data ?? []) as TaskRow[]).map(mapTask), error: null };
+}
+
+export async function getGanttSetupError(): Promise<string | null> {
+  await getTaskUserContext();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tasks")
+    .select("planned_start_date, actual_started_at")
+    .limit(1);
+
+  return error ? "Виконайте файл supabase/task-gantt.sql у SQL Editor." : null;
 }
 
 export async function getTaskDetail(taskId: string, includeAttachments = false): Promise<TaskDetailResult> {

@@ -21,7 +21,9 @@ export type Task = Readonly<{
   goal: string | null;
   area: TaskArea;
   horizon: TaskHorizon;
+  plannedStartDate: string | null;
   dueDate: string | null;
+  actualStartedAt: string | null;
   status: TaskStatus;
   postponedUntil: string | null;
   createdByName: string;

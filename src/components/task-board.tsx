@@ -58,7 +58,7 @@ function nextTask(task: Task, kind: UpdateKind, memberName: string, postponedUnt
   const changedAt = new Date().toISOString();
 
   if (kind === "completed") {
-    return { ...task, status: "completed", postponedUntil: null, completedBy: memberName, completedAt: changedAt, rejectedBy: null, rejectedAt: null };
+    return { ...task, status: "completed", postponedUntil: null, completedBy: memberName, completedAt: changedAt, rejectedBy: null, rejectedAt: null, actualStartedAt: task.actualStartedAt ?? changedAt };
   }
 
   if (kind === "rejected") {
@@ -69,7 +69,7 @@ function nextTask(task: Task, kind: UpdateKind, memberName: string, postponedUnt
     return { ...task, status: "postponed", postponedUntil: postponedUntil || oneMonthFromNow(), completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null };
   }
 
-  return { ...task, status: kind, postponedUntil: null, completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null };
+  return { ...task, status: kind, postponedUntil: null, completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null, actualStartedAt: task.actualStartedAt ?? ((kind === "in_work" || kind === "in_progress") ? changedAt : null) };
 }
 
 function taskUpdate(task: Task) {
@@ -78,6 +78,7 @@ function taskUpdate(task: Task) {
     postponed_until: task.postponedUntil,
     completed_by: task.completedBy,
     completed_at: task.completedAt,
+    actual_started_at: task.actualStartedAt,
     rejected_by: task.rejectedBy,
     rejected_at: task.rejectedAt,
   };

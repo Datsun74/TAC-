@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Task, TaskArea, TaskHorizon } from "@/types/task";
 
 type TaskEditorProps = Readonly<{
-  task: Pick<Task, "id" | "title" | "goal" | "area" | "horizon" | "dueDate">;
+  task: Pick<Task, "id" | "title" | "goal" | "area" | "horizon" | "plannedStartDate" | "dueDate">;
 }>;
 
 export function TaskEditor({ task }: TaskEditorProps) {
@@ -18,6 +18,7 @@ export function TaskEditor({ task }: TaskEditorProps) {
   const [goal, setGoal] = useState(task.goal ?? "");
   const [area, setArea] = useState<TaskArea>(task.area);
   const [horizon, setHorizon] = useState<TaskHorizon>(task.horizon);
+  const [plannedStartDate, setPlannedStartDate] = useState(task.plannedStartDate ?? "");
   const [dueDate, setDueDate] = useState(task.dueDate ?? "");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -27,6 +28,7 @@ export function TaskEditor({ task }: TaskEditorProps) {
     setGoal(task.goal ?? "");
     setArea(task.area);
     setHorizon(task.horizon);
+    setPlannedStartDate(task.plannedStartDate ?? "");
     setDueDate(task.dueDate ?? "");
     setError("");
     setIsOpen(false);
@@ -47,6 +49,11 @@ export function TaskEditor({ task }: TaskEditorProps) {
       return;
     }
 
+    if (plannedStartDate && dueDate && plannedStartDate > dueDate) {
+      setError("Плановий старт не може бути пізніше планового завершення.");
+      return;
+    }
+
     setError("");
     setIsSaving(true);
 
@@ -57,12 +64,13 @@ export function TaskEditor({ task }: TaskEditorProps) {
         goal: normalizedGoal || null,
         area,
         horizon,
+        planned_start_date: plannedStartDate || null,
         due_date: dueDate || null,
       })
       .eq("id", task.id);
 
     if (updateError) {
-      setError("Не вдалося зберегти зміни. Оновіть сторінку й спробуйте ще раз.");
+      setError(updateError.code === "42703" ? "Виконайте supabase/task-gantt.sql у Supabase SQL Editor, а потім повторіть спробу." : "Не вдалося зберегти зміни. Оновіть сторінку й спробуйте ще раз.");
       setIsSaving(false);
       return;
     }
@@ -94,7 +102,7 @@ export function TaskEditor({ task }: TaskEditorProps) {
           <label className="block text-sm font-semibold text-stone-900" htmlFor="edit-task-goal">Кінцева мета</label>
           <textarea className="mt-2 min-h-24 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-100" id="edit-task-goal" maxLength={5000} onChange={(event) => setGoal(event.target.value)} rows={3} value={goal} />
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="block text-sm font-semibold text-stone-900" htmlFor="edit-task-area">Напрям</label>
             <select className="mt-2 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-950 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-100" id="edit-task-area" onChange={(event) => setArea(event.target.value as TaskArea)} value={area}>
@@ -108,7 +116,11 @@ export function TaskEditor({ task }: TaskEditorProps) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-stone-900" htmlFor="edit-task-date">Бажана дата</label>
+            <label className="block text-sm font-semibold text-stone-900" htmlFor="edit-task-start-date">Плановий старт</label>
+            <input className="mt-2 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-950 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-100" id="edit-task-start-date" onChange={(event) => setPlannedStartDate(event.target.value)} type="date" value={plannedStartDate} />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-stone-900" htmlFor="edit-task-date">Планове завершення</label>
             <input className="mt-2 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-950 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-100" id="edit-task-date" onChange={(event) => setDueDate(event.target.value)} type="date" value={dueDate} />
           </div>
         </div>
