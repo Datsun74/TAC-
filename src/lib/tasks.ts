@@ -115,7 +115,8 @@ function shouldUseLegacyTaskFields(error: { code?: string; message?: string } | 
 }
 
 export async function getTasks(statuses: readonly TaskStatus[]): Promise<TasksResult> {
-  await getTaskUserContext();
+  const context = await getTaskUserContext();
+  const testWorkspaceIds = new Set(context.workspaces.filter((workspace) => workspace.status === "test").map((workspace) => workspace.id));
   const supabase = await createClient();
   const initialResult = await supabase
     .from("tasks")
@@ -144,7 +145,9 @@ export async function getTasks(statuses: readonly TaskStatus[]): Promise<TasksRe
     };
   }
 
-  return { tasks: ((data ?? []) as TaskRow[]).map(mapTask), error: null };
+  const visibleTaskRows = ((data ?? []) as TaskRow[]).filter((task) => !task.workspace_id || !testWorkspaceIds.has(task.workspace_id));
+
+  return { tasks: visibleTaskRows.map(mapTask), error: null };
 }
 
 export async function getGanttSetupError(): Promise<string | null> {

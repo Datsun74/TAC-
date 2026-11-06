@@ -42,6 +42,11 @@ export function TaskWorkspacesPanel({ currentUserId, displayName, testMode, work
   const [changingStatusFor, setChangingStatusFor] = useState<string | null>(null);
   const [error, setError] = useState("");
   const members = workspaceMembers.map((member) => ({ ...member, role: changedRoles[member.workspaceId + member.id] ?? member.role }));
+  const listedWorkspaces = [...workspaces].sort((left, right) => {
+    const leftStatus = changedStatuses[left.id] ?? left.status;
+    const rightStatus = changedStatuses[right.id] ?? right.status;
+    return leftStatus === rightStatus ? left.name.localeCompare(right.name, "uk") : leftStatus === "active" ? -1 : 1;
+  });
 
   async function createWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -157,7 +162,7 @@ export function TaskWorkspacesPanel({ currentUserId, displayName, testMode, work
           <p className="mt-6 rounded-2xl bg-stone-100 px-4 py-4 text-sm leading-6 text-stone-600">Ви ще не належите до жодного робочого простору.</p>
         ) : (
           <ul className="mt-6 divide-y divide-stone-100">
-            {workspaces.map((workspace) => {
+            {listedWorkspaces.map((workspace) => {
               const status = changedStatuses[workspace.id] ?? workspace.status;
               const canManage = workspace.role === "owner" || workspace.role === "manager";
 
