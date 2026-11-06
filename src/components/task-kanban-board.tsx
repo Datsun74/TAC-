@@ -242,15 +242,15 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
     return (
       <section className={`${columnStyle(status)} ${isDropTarget ? "ring-2 ring-amber-700 ring-offset-2" : ""} min-w-0 rounded-2xl border p-3 transition-shadow`} key={status} onDragOver={(event) => allowDrop(event, status)} onDrop={(event) => dropTask(event, status)}>
         <div className="flex items-center justify-between gap-2"><h2 className="min-w-0 text-sm font-semibold leading-5 text-stone-950">{taskStatusLabels[status]}</h2><span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-stone-700">{columnTasks.length}</span></div>
-        {columnTasks.length > 0 ? <div className="mt-3 space-y-4">{orderedHorizons.map((horizon) => {
+        {columnTasks.length > 0 ? <div className="mt-3 divide-y-2 divide-stone-300 border-t-2 border-stone-300">{orderedHorizons.map((horizon) => {
           const groups = taskGroupsForHorizon(columnTasks.filter((task) => task.horizon === horizon));
           if (groups.length === 0) return null;
-          return <section className="space-y-2" key={horizon}>
-            <h3 className="border-b border-stone-200 pb-1 text-[11px] font-bold tracking-wide text-stone-600 uppercase">{taskHorizonLabels[horizon]}</h3>
-            {groups.map((group) => <div className="space-y-2" key={group.id}>
-              <p className="truncate px-1 text-[11px] font-semibold leading-4 text-amber-900" title={group.label}>{group.label}</p>
+          return <section className="py-3 first:pt-2" key={horizon}>
+            <h3 className="flex items-center gap-2 text-[11px] font-bold tracking-wide text-stone-700 uppercase"><span className="h-px flex-1 bg-stone-300" />{taskHorizonLabels[horizon]}<span className="h-px flex-1 bg-stone-300" /></h3>
+            <div className="mt-2 space-y-3">{groups.map((group) => <div className="space-y-2" key={group.id}>
+              <p className={`truncate px-1 text-[11px] font-semibold leading-4 ${group.sortOrder === 0 ? "text-amber-900" : "text-stone-600"}`} title={group.label}>{group.sortOrder === 0 ? "Проєкт · " : "Простір · "}{group.label.replace(/^(Проєкт|Простір) · /, "")}</p>
               <div className="space-y-2">{group.tasks.map((task) => <TaskCard isMoving={movingTaskId === task.id} key={task.id} onDragEnd={() => { setDraggedTaskId(null); setDropTargetStatus(null); }} onDragStart={startDragging} task={task} testMode={testMode} />)}</div>
-            </div>)}
+            </div>)}</div>
           </section>;
         })}</div> : <p className="mt-3 rounded-xl bg-white/70 px-3 py-4 text-sm text-stone-500">Перетягніть сюди задачу.</p>}
       </section>
@@ -264,7 +264,7 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
           <label className="min-w-[13rem] flex-1 sm:max-w-sm"><span className="sr-only">Пошук задач на канбані</span><input className="min-h-10 w-full rounded-full border border-stone-300 bg-white px-4 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-amber-700 focus:ring-2 focus:ring-amber-100" onChange={(event) => setSearch(event.target.value)} placeholder="Пошук задач, проєктів, людей…" type="search" value={search} /></label>
           <button aria-expanded={filtersOpen} className="min-h-10 rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-800 transition-colors hover:bg-stone-50" onClick={() => setFiltersOpen((open) => !open)} type="button">Фільтри{filtersApplied ? ` (${selectedAreas.length + selectedHorizons.length + selectedPeople.length + selectedProjectIds.length + selectedStatuses.length + (search.trim() ? 1 : 0)})` : ""}</button>
           {filtersApplied ? <button className="min-h-10 rounded-full px-3 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={clearFilters} type="button">Очистити</button> : null}
-          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Перетягніть картку до іншої колонки, щоб змінити її стан. Порядок: тактичні → оперативні → стратегічні; робота → сім’я → особисте. Назва проєкту показана під задачею.</p>
+          <p className="basis-full text-xs leading-5 text-stone-500 sm:ml-2 sm:basis-auto">Перетягніть картку до іншої колонки, щоб змінити її стан. У кожному стані задачі поділено лініями: тактичні → оперативні → стратегічні. Усередині рівня проєкти йдуть перед просторами.</p>
         </div>
 
         {filtersOpen ? (
