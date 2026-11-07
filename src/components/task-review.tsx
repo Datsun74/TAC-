@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 
 import { readLocalTestTasks } from "@/lib/local-test-tasks";
 import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
@@ -112,21 +112,26 @@ function ReviewCard({ section, testMode }: Readonly<{ section: ReviewSection; te
 export function TaskReview({ tasks, testMode }: TaskReviewProps) {
   const localTasks = useSyncExternalStore(subscribeToLocalTasks, readLocalTestTasks, () => [] as Task[]);
   const items = testMode ? localTasks : tasks;
+  const [selectedResponsible, setSelectedResponsible] = useState<string | null>(null);
   const today = dateOnly(new Date());
   const weekEnd = addDays(today, 7);
 
   const openTasks = useMemo(() => items.filter((task) => openStatuses.includes(task.status)), [items]);
+  const reviewTasks = useMemo(
+    () => selectedResponsible === null ? openTasks : openTasks.filter((task) => responsibleName(task) === selectedResponsible),
+    [openTasks, selectedResponsible],
+  );
   const sections = useMemo<readonly ReviewSection[]>(() => {
-    const overdue = openTasks.filter((task) => {
+    const overdue = reviewTasks.filter((task) => {
       const date = planningDate(task);
       return date !== null && date < today;
     });
-    const dueToday = openTasks.filter((task) => planningDate(task) === today);
-    const upcoming = openTasks.filter((task) => {
+    const dueToday = reviewTasks.filter((task) => planningDate(task) === today);
+    const upcoming = reviewTasks.filter((task) => {
       const date = planningDate(task);
       return date !== null && date > today && date <= weekEnd;
     });
-    const noDate = openTasks.filter((task) => planningDate(task) === null);
+    const noDate = reviewTasks.filter((task) => planningDate(task) === null);
     const order = (left: Task, right: Task) => (planningDate(left) ?? "9999-12-31").localeCompare(planningDate(right) ?? "9999-12-31") || left.title.localeCompare(right.title, "uk");
     return [
       { title: "Потребують уваги", description: "Строк уже минув або відкладення завершилося.", tone: "urgent", tasks: overdue.sort(order) },
@@ -134,14 +139,14 @@ export function TaskReview({ tasks, testMode }: TaskReviewProps) {
       { title: "Наступні 7 днів", description: "Підготуйтеся завчасно, щоб не втратити строки.", tone: "upcoming", tasks: upcoming.sort(order) },
       { title: "Без строку", description: "Задачі без визначеної дати — розставте пріоритети.", tone: "quiet", tasks: noDate.sort((left, right) => left.title.localeCompare(right.title, "uk")) },
     ];
-  }, [openTasks, today, weekEnd]);
+  }, [reviewTasks, today, weekEnd]);
 
   const statusCounts = useMemo(() => ({
-    active: openTasks.filter((task) => task.status === "active").length,
-    inWork: openTasks.filter((task) => task.status === "in_work").length,
-    inProgress: openTasks.filter((task) => task.status === "in_progress").length,
-    postponed: openTasks.filter((task) => task.status === "postponed").length,
-  }), [openTasks]);
+    active: reviewTasks.filter((task) => task.status === "active").length,
+    inWork: reviewTasks.filter((task) => task.status === "in_work").length,
+    inProgress: reviewTasks.filter((task) => task.status === "in_progress").length,
+    postponed: reviewTasks.filter((task) => task.status === "postponed").length,
+  }), [reviewTasks]);
 
   const responsibilitySummary = useMemo<readonly ResponsibilitySummary[]>(() => {
     const people = new Map<string, ResponsibilitySummary>();
@@ -168,8 +173,8 @@ export function TaskReview({ tasks, testMode }: TaskReviewProps) {
     </section>
 
     <section className="mt-5 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm" aria-label="Розподіл задач за відповідальними">
-      <div className="flex items-start justify-between gap-3 px-4 py-3 sm:px-5"><div><h2 className="text-base font-semibold text-stone-950">За відповідальними</h2><p className="mt-0.5 text-xs leading-5 text-stone-600">Відкриті задачі розподілені за людиною, яка відповідає за результат.</p></div><span className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700">{responsibilitySummary.length}</span></div>
-      {responsibilitySummary.length === 0 ? <p className="border-t border-stone-100 px-4 py-3 text-sm text-stone-500 sm:px-5">Немає відкритих задач.</p> : <ul className="grid divide-y divide-stone-100 border-t border-stone-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0">{responsibilitySummary.map((person) => <li className="flex flex-col gap-2 px-4 py-3 sm:px-5" key={person.name}><p className="min-w-0 truncate text-sm font-semibold text-stone-950">{person.name}</p><div className="flex flex-wrap gap-1.5 text-[11px] font-semibold"><span className="rounded-full bg-stone-100 px-2 py-1 text-stone-700">Відкриті: {person.total}</span>{person.inProgress > 0 ? <span className="rounded-full bg-sky-100 px-2 py-1 text-sky-900">У процесі: {person.inProgress}</span> : null}{person.overdue > 0 ? <span className="rounded-full bg-red-50 px-2 py-1 text-red-800">Прострочено: {person.overdue}</span> : null}</div></li>)}</ul>}
+      <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 sm:px-5"><div><h2 className="text-base font-semibold text-stone-950">За відповідальними</h2><p className="mt-0.5 text-xs leading-5 text-stone-600">Оберіть людину, щоб одразу відфільтрувати всі блоки огляду.</p></div><div className="flex items-center gap-2"><span className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700">{responsibilitySummary.length}</span><button aria-pressed={selectedResponsible === null} className={selectedResponsible === null ? "min-h-8 rounded-full bg-amber-800 px-3 text-xs font-semibold text-white" : "min-h-8 rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-50"} onClick={() => setSelectedResponsible(null)} type="button">Усі</button></div></div>
+      {responsibilitySummary.length === 0 ? <p className="border-t border-stone-100 px-4 py-3 text-sm text-stone-500 sm:px-5">Немає відкритих задач.</p> : <ul className="grid divide-y divide-stone-100 border-t border-stone-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0">{responsibilitySummary.map((person) => <li key={person.name}><button aria-pressed={selectedResponsible === person.name} className={selectedResponsible === person.name ? "flex w-full flex-col gap-2 bg-amber-50 px-4 py-3 text-left sm:px-5" : "flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-stone-50 sm:px-5"} onClick={() => setSelectedResponsible(person.name)} type="button"><p className="min-w-0 truncate text-sm font-semibold text-stone-950">{person.name}</p><div className="flex flex-wrap gap-1.5 text-[11px] font-semibold"><span className="rounded-full bg-stone-100 px-2 py-1 text-stone-700">Відкриті: {person.total}</span>{person.inProgress > 0 ? <span className="rounded-full bg-sky-100 px-2 py-1 text-sky-900">У процесі: {person.inProgress}</span> : null}{person.overdue > 0 ? <span className="rounded-full bg-red-50 px-2 py-1 text-red-800">Прострочено: {person.overdue}</span> : null}</div></button></li>)}</ul>}
     </section>
 
     <div className="mt-5 grid gap-4 xl:grid-cols-2">
