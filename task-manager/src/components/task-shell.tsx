@@ -30,6 +30,11 @@ export function TaskShell({ children, displayName, spaceName, testMode }: TaskSh
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const primaryNavigationHrefs = new Set(["/tasks", "/tasks/mine", "/tasks/board", "/tasks/add"]);
+  const primaryNavigation = navigation.filter((item) => primaryNavigationHrefs.has(item.href));
+  const overflowNavigation = navigation.filter((item) => !primaryNavigationHrefs.has(item.href));
+  const hasCurrentOverflowItem = overflowNavigation.some((item) => pathname === item.href);
 
   async function signOut() {
     setIsSigningOut(true);
@@ -84,16 +89,18 @@ export function TaskShell({ children, displayName, spaceName, testMode }: TaskSh
 
       {signOutError ? <p aria-live="assertive" className="fixed right-4 bottom-24 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-lg lg:bottom-4">{signOutError}</p> : null}
       <nav aria-label="Навігація на телефоні" className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/95 px-1 py-2 shadow-[0_-8px_24px_rgba(28,25,23,0.08)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-4 gap-1 sm:grid-cols-8">
-          {navigation.map((item) => {
+        {isMobileMenuOpen ? <div className="absolute right-2 bottom-[calc(100%+0.5rem)] left-2 mx-auto max-w-lg rounded-2xl border border-stone-200 bg-white p-2 shadow-xl"><p className="px-2 pt-1 pb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Інші розділи</p><div className="grid grid-cols-2 gap-1">{overflowNavigation.map((item) => { const isCurrent = pathname === item.href; return <Link aria-current={isCurrent ? "page" : undefined} className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${isCurrent ? "bg-amber-100 text-amber-950" : "text-stone-700 hover:bg-stone-100"}`} href={item.href} key={item.href} onClick={() => setIsMobileMenuOpen(false)}>{item.label}</Link>; })}</div></div> : null}
+        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+          {primaryNavigation.map((item) => {
             const isCurrent = pathname === item.href;
             return (
-              <Link aria-current={isCurrent ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center rounded-xl px-1 text-center text-[10px] font-bold leading-tight ${isCurrent ? "bg-amber-100 text-amber-950" : "text-stone-600"}`} href={item.href} key={item.href}>
+              <Link aria-current={isCurrent ? "page" : undefined} className={`flex min-h-12 flex-col items-center justify-center rounded-xl px-1 text-center text-[10px] font-bold leading-tight ${isCurrent ? "bg-amber-100 text-amber-950" : "text-stone-600"}`} href={item.href} key={item.href} onClick={() => setIsMobileMenuOpen(false)}>
                 <span aria-hidden="true" className="text-base leading-none">{item.symbol}</span>
                 <span className="mt-1">{item.mobileLabel}</span>
               </Link>
             );
           })}
+          <button aria-expanded={isMobileMenuOpen} aria-label="Відкрити інші розділи" className={`flex min-h-12 flex-col items-center justify-center rounded-xl px-1 text-center text-[10px] font-bold leading-tight ${isMobileMenuOpen || hasCurrentOverflowItem ? "bg-amber-100 text-amber-950" : "text-stone-600"}`} onClick={() => setIsMobileMenuOpen((open) => !open)} type="button"><span aria-hidden="true" className="text-base leading-none">☰</span><span className="mt-1">Ще</span></button>
         </div>
       </nav>
     </div>

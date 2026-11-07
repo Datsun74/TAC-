@@ -51,7 +51,13 @@ export function AppShell({
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileGridClassName = navigation.length === 4 ? "grid-cols-4" : navigation.length === 5 ? "grid-cols-5" : navigation.length === 7 ? "grid-cols-7" : "grid-cols-6";
+  const usesCompactTaskNavigation = navigation.length > 7 && navigation.some((item) => item.href === "/tasks/mine");
+  const primaryTaskNavigationHrefs = new Set(["/tasks", "/tasks/mine", "/tasks/board", "/tasks/add"]);
+  const mobilePrimaryNavigation = usesCompactTaskNavigation ? navigation.filter((item) => primaryTaskNavigationHrefs.has(item.href)) : navigation;
+  const mobileOverflowNavigation = usesCompactTaskNavigation ? navigation.filter((item) => !primaryTaskNavigationHrefs.has(item.href)) : [];
+  const hasCurrentOverflowItem = mobileOverflowNavigation.some((item) => pathname === item.href);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -86,7 +92,10 @@ export function AppShell({
       {signOutError ? <p aria-live="polite" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">{signOutError}</p> : null}
       <main className="flex flex-1">{children}</main>
       <footer className="border-t border-stone-200 py-5 pb-24 text-sm text-stone-500 lg:pb-5">{footerText}</footer>
-      <nav aria-label="Навігація на телефоні" className="fixed inset-x-0 bottom-0 z-10 border-t border-stone-200 bg-white/95 px-1 pt-2 shadow-[0_-8px_24px_rgba(28,25,23,0.08)] backdrop-blur lg:hidden"><ul className={`mx-auto grid max-w-7xl ${mobileGridClassName}`}>{navigation.map((item) => { const isCurrent = pathname === item.href; return <li key={item.href}><Link aria-current={isCurrent ? "page" : undefined} aria-label={item.label} className={`flex min-h-14 flex-col items-center justify-center rounded-xl px-0.5 text-center text-[9px] leading-tight font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none ${isCurrent ? "bg-amber-100 text-amber-950" : "text-stone-600 hover:bg-stone-100"}`} href={item.href}><span aria-hidden="true" className="mb-0.5 text-base leading-none">{mobileIcon(item.href)}</span><span>{item.mobileLabel}</span></Link></li>; })}</ul></nav>
+      <nav aria-label="Навігація на телефоні" className="fixed inset-x-0 bottom-0 z-10 border-t border-stone-200 bg-white/95 px-1 pt-2 shadow-[0_-8px_24px_rgba(28,25,23,0.08)] backdrop-blur lg:hidden">
+        {isMobileMenuOpen ? <div className="absolute right-2 bottom-[calc(100%+0.5rem)] left-2 mx-auto max-w-lg rounded-2xl border border-stone-200 bg-white p-2 shadow-xl"><p className="px-2 pt-1 pb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Інші розділи</p><div className="grid grid-cols-2 gap-1">{mobileOverflowNavigation.map((item) => { const isCurrent = pathname === item.href; return <Link aria-current={isCurrent ? "page" : undefined} className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${isCurrent ? "bg-amber-100 text-amber-950" : "text-stone-700 hover:bg-stone-100"}`} href={item.href} key={item.href} onClick={() => setIsMobileMenuOpen(false)}>{item.label}</Link>; })}</div></div> : null}
+        <ul className={`mx-auto grid max-w-7xl ${usesCompactTaskNavigation ? "grid-cols-5" : mobileGridClassName}`}>{mobilePrimaryNavigation.map((item) => { const isCurrent = pathname === item.href; return <li key={item.href}><Link aria-current={isCurrent ? "page" : undefined} aria-label={item.label} className={`flex min-h-14 flex-col items-center justify-center rounded-xl px-0.5 text-center text-[9px] leading-tight font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none ${isCurrent ? "bg-amber-100 text-amber-950" : "text-stone-600 hover:bg-stone-100"}`} href={item.href} onClick={() => setIsMobileMenuOpen(false)}><span aria-hidden="true" className="mb-0.5 text-base leading-none">{mobileIcon(item.href)}</span><span>{item.mobileLabel}</span></Link></li>; })}{usesCompactTaskNavigation ? <li><button aria-expanded={isMobileMenuOpen} aria-label="Відкрити інші розділи" className={`flex min-h-14 w-full flex-col items-center justify-center rounded-xl px-0.5 text-center text-[9px] leading-tight font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 focus-visible:outline-none ${isMobileMenuOpen || hasCurrentOverflowItem ? "bg-amber-100 text-amber-950" : "text-stone-600 hover:bg-stone-100"}`} onClick={() => setIsMobileMenuOpen((open) => !open)} type="button"><span aria-hidden="true" className="mb-0.5 text-base leading-none">☰</span><span>Ще</span></button></li> : null}</ul>
+      </nav>
     </div>
   );
 }
