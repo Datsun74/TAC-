@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { readLocalTestTasks } from "@/lib/local-test-tasks";
-import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
-import type { Task, TaskStatus } from "@/types/task";
+import { formatTaskDate, taskAreaLabels, taskAreaOptions, taskHorizonLabels, taskHorizonOptions, taskStatusLabels } from "@/lib/task-options";
+import type { Task, TaskArea, TaskHorizon, TaskStatus } from "@/types/task";
 
 type TaskReviewProps = Readonly<{
   tasks: readonly Task[];
@@ -30,6 +30,10 @@ const openStatuses: readonly TaskStatus[] = ["active", "in_work", "in_progress",
 
 function subscribeToLocalTasks() {
   return () => {};
+}
+
+function toggleChoice<T>(current: readonly T[], value: T) {
+  return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
 }
 
 function dateOnly(date: Date) {
@@ -113,13 +117,25 @@ export function TaskReview({ tasks, testMode }: TaskReviewProps) {
   const localTasks = useSyncExternalStore(subscribeToLocalTasks, readLocalTestTasks, () => [] as Task[]);
   const items = testMode ? localTasks : tasks;
   const [selectedResponsible, setSelectedResponsible] = useState<string | null>(null);
+  const [selectedHorizons, setSelectedHorizons] = useState<readonly TaskHorizon[]>([]);
+  const [selectedAreas, setSelectedAreas] = useState<readonly TaskArea[]>([]);
   const today = dateOnly(new Date());
   const weekEnd = addDays(today, 7);
 
   const openTasks = useMemo(() => items.filter((task) => openStatuses.includes(task.status)), [items]);
+  const filteredTasks = useMemo(
+    () => openTasks.filter((task) => (selectedHorizons.length === 0 || selectedHorizons.includes(task.horizon)) && (selectedAreas.length === 0 || selectedAreas.includes(task.area))),
+    [openTasks, selectedAreas, selectedHorizons],
+  );
+  const selectedResponsibleIsAvailable = selectedResponsible === null || filteredTasks.some((task) => responsibleName(task) === selectedResponsible);
+
+  useEffect(() => {
+    if (!selectedResponsibleIsAvailable) setSelectedResponsible(null);
+  }, [selectedResponsibleIsAvailable]);
+
   const reviewTasks = useMemo(
-    () => selectedResponsible === null ? openTasks : openTasks.filter((task) => responsibleName(task) === selectedResponsible),
-    [openTasks, selectedResponsible],
+    () => selectedResponsible === null ? filteredTasks : filteredTasks.filter((task) => responsibleName(task) === selectedResponsible),
+    [filteredTasks, selectedResponsible],
   );
   const sections = useMemo<readonly ReviewSection[]>(() => {
     const overdue = reviewTasks.filter((task) => {
@@ -150,7 +166,7 @@ export function TaskReview({ tasks, testMode }: TaskReviewProps) {
 
   const responsibilitySummary = useMemo<readonly ResponsibilitySummary[]>(() => {
     const people = new Map<string, ResponsibilitySummary>();
-    openTasks.forEach((task) => {
+    filteredTasks.forEach((task) => {
       const name = responsibleName(task);
       const previous = people.get(name) ?? { name, total: 0, inProgress: 0, overdue: 0 };
       const planning = planningDate(task);
@@ -162,9 +178,19 @@ export function TaskReview({ tasks, testMode }: TaskReviewProps) {
       });
     });
     return [...people.values()].sort((left, right) => right.overdue - left.overdue || right.total - left.total || left.name.localeCompare(right.name, "uk"));
-  }, [openTasks, today]);
+  }, [filteredTasks, today]);
+
+  const filterCount = selectedHorizons.length + selectedAreas.length;
 
   return <>
+    <section className="mt-8 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Швидкий відбір задач">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-semibold text-stone-950">Швидкий відбір</h2><p className="mt-0.5 text-xs leading-5 text-stone-600">Поєднуйте рівні планування та напрями. Без вибору відображаються всі відкриті задачі.</p></div>{filterCount > 0 ? <button className="min-h-8 rounded-full px-3 text-xs font-semibold text-stone-600 hover:bg-stone-100" onClick={() => { setSelectedHorizons([]); setSelectedAreas([]); }} type="button">Очистити ({filterCount})</button> : null}</div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <fieldset><legend className="text-xs font-semibold uppercase tracking-wide text-stone-600">Рівень планування</legend><div className="mt-2 flex flex-wrap gap-2">{taskHorizonOptions.map((option) => <button aria-pressed={selectedHorizons.includes(option.value)} className={selectedHorizons.includes(option.value) ? "min-h-8 rounded-full bg-amber-800 px-3 text-xs font-semibold text-white" : "min-h-8 rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-50"} key={option.value} onClick={() => setSelectedHorizons((current) => toggleChoice(current, option.value))} type="button">{option.label}</button>)}</div></fieldset>
+        <fieldset><legend className="text-xs font-semibold uppercase tracking-wide text-stone-600">Напрям</legend><div className="mt-2 flex flex-wrap gap-2">{taskAreaOptions.map((option) => <button aria-pressed={selectedAreas.includes(option.value)} className={selectedAreas.includes(option.value) ? "min-h-8 rounded-full bg-amber-800 px-3 text-xs font-semibold text-white" : "min-h-8 rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-50"} key={option.value} onClick={() => setSelectedAreas((current) => toggleChoice(current, option.value))} type="button">{option.label}</button>)}</div></fieldset>
+      </div>
+    </section>
+
     <section className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Коротка картина по задачах">
       <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Активні</p><p className="mt-1 text-2xl font-semibold text-stone-950">{statusCounts.active}</p></div>
       <div className="rounded-2xl border border-violet-200 bg-violet-50/50 px-4 py-3 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-violet-800">Взято в роботу</p><p className="mt-1 text-2xl font-semibold text-violet-950">{statusCounts.inWork}</p></div>
