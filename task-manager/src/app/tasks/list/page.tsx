@@ -31,7 +31,7 @@ export default async function TasksListPage({ searchParams }: Readonly<{ searchP
           <h2 className="text-lg font-semibold text-amber-950">Задачник потребує одного налаштування</h2>
           <p className="mt-2 text-sm leading-6 text-amber-900">{result.error}</p>
         </section>
-      ) : <><div className="mt-6 flex flex-wrap items-center gap-3">{requestedProjectId ? <Link className="inline-flex min-h-10 items-center rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50" href="/tasks/list">Показати всі задачі</Link> : null}{projectTaskCount !== null ? <p className="text-sm text-stone-500">У проєкті відкритих задач: {projectTaskCount}.</p> : null}</div><TaskBoard memberName={member.displayName} projectId={requestedProjectId} tasks={filteredTasks} testMode={testMode} view="list" /></>}
+      ) : <><div className="mt-6 flex flex-wrap items-center gap-3">{requestedProjectId ? <Link className="inline-flex min-h-10 items-center rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50" href="/tasks/list">Показати всі задачі</Link> : null}{projectTaskCount !== null ? <p className="text-sm text-stone-500">У проєкті відкритих задач: {projectTaskCount}.</p> : null}</div><TaskBoard memberId={member.userId} memberName={member.displayName} projectId={requestedProjectId} tasks={filteredTasks} testMode={testMode} view="list" /></>}
     </section>
   );
 }

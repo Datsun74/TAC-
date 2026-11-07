@@ -15,6 +15,7 @@ type TaskShellProps = Readonly<{
 
 const navigation = [
   { href: "/tasks", label: "Сьогодні", mobileLabel: "Сьогодні", symbol: "⌂" },
+  { href: "/tasks/mine", label: "Мої задачі", mobileLabel: "Мої", symbol: "●" },
   { href: "/tasks/list", label: "Усі задачі", mobileLabel: "Усі", symbol: "≡" },
   { href: "/tasks/board", label: "Дошка", mobileLabel: "Дошка", symbol: "▦" },
   { href: "/tasks/gantt", label: "Гант", mobileLabel: "Гант", symbol: "▤" },

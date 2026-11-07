@@ -26,7 +26,7 @@ export default async function TasksTodayPage() {
           <h2 className="text-lg font-semibold text-amber-950">Задачник потребує одного налаштування</h2>
           <p className="mt-2 text-sm leading-6 text-amber-900">{result.error}</p>
         </section>
-      ) : <TaskBoard memberName={member.displayName} tasks={result?.tasks ?? []} testMode={testMode} view="today" />}
+      ) : <TaskBoard memberId={member.userId} memberName={member.displayName} tasks={result?.tasks ?? []} testMode={testMode} view="today" />}
     </section>
   );
 }

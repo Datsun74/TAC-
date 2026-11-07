@@ -11,9 +11,10 @@ import type { Task, TaskArea, TaskHorizon, TaskStatus } from "@/types/task";
 
 type TaskBoardProps = Readonly<{
   tasks: readonly Task[];
+  memberId: string;
   memberName: string;
   testMode: boolean;
-  view: "today" | "list" | "history";
+  view: "today" | "mine" | "list" | "history";
   projectId?: string;
 }>;
 
@@ -84,9 +85,13 @@ function taskUpdate(task: Task) {
   };
 }
 
-function isInCurrentView(task: Task, view: TaskBoardProps["view"]) {
+function isInCurrentView(task: Task, view: TaskBoardProps["view"], memberId: string) {
   if (view === "history") return task.status === "completed" || task.status === "rejected";
   if (view === "list") return task.status === "active" || task.status === "in_work" || task.status === "in_progress" || task.status === "postponed";
+  if (view === "mine") {
+    const isOpen = task.status === "active" || task.status === "in_work" || task.status === "in_progress" || task.status === "postponed";
+    return isOpen && (task.assigneeId ?? task.createdById) === memberId;
+  }
   if (task.status === "postponed") return task.postponedUntil !== null && task.postponedUntil <= currentDate();
 
   return (task.status === "active" || task.status === "in_work" || task.status === "in_progress")
@@ -96,12 +101,14 @@ function isInCurrentView(task: Task, view: TaskBoardProps["view"]) {
 function emptyMessage(view: TaskBoardProps["view"], filtersApplied: boolean) {
   if (filtersApplied) return "За обраними фільтрами задач немає.";
   if (view === "today") return "На сьогодні активних задач немає.";
+  if (view === "mine") return "За вами поки немає активних задач.";
   if (view === "history") return "Тут з’являться виконані та відхилені задачі.";
   return "Активних, виконуваних або відкладених задач поки немає.";
 }
 
 function reportTitle(view: TaskBoardProps["view"]) {
   if (view === "today") return "Задачі на сьогодні";
+  if (view === "mine") return "Мої задачі";
   if (view === "history") return "Історія задач";
   return "Усі активні задачі";
 }
@@ -210,7 +217,7 @@ function PostponeControls({ task, date, isUpdating, onChange, onConfirm, onCance
   );
 }
 
-export function TaskBoard({ tasks, memberName, testMode, view, projectId }: TaskBoardProps) {
+export function TaskBoard({ tasks, memberId, memberName, testMode, view, projectId }: TaskBoardProps) {
   const router = useRouter();
   const localTasks = useSyncExternalStore(subscribeToLocalTasks, () => (testMode ? readLocalTestTasks() : tasks), () => tasks);
   const [overriddenItems, setOverriddenItems] = useState<readonly Task[] | null>(null);
@@ -229,13 +236,13 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
   const items = overriddenItems ?? localTasks;
   const filtersApplied = Boolean(search.trim()) || selectedAreas.length > 0 || selectedHorizons.length > 0 || selectedAuthors.length > 0 || selectedExecutors.length > 0 || selectedContainers.length > 0 || selectedStatuses.length > 0;
 
-  const authorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map((task) => task.createdByName))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
-  const executorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map(responsibleLabel))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
-  const containerOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view)).map(containerLabel))).sort((left, right) => left.localeCompare(right, "uk")), [items, view]);
+  const authorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view, memberId)).map((task) => task.createdByName))).sort((left, right) => left.localeCompare(right, "uk")), [items, memberId, view]);
+  const executorOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view, memberId)).map(responsibleLabel))).sort((left, right) => left.localeCompare(right, "uk")), [items, memberId, view]);
+  const containerOptions = useMemo(() => Array.from(new Set(items.filter((task) => isInCurrentView(task, view, memberId)).map(containerLabel))).sort((left, right) => left.localeCompare(right, "uk")), [items, memberId, view]);
 
   const visibleTasks = useMemo(() => {
     return items
-      .filter((task) => isInCurrentView(task, view))
+      .filter((task) => isInCurrentView(task, view, memberId))
       .filter((task) => !projectId || task.projectId === projectId)
       .filter((task) => taskMatchesSearch(task, search))
       .filter((task) => selectedAreas.length === 0 || selectedAreas.includes(task.area))
@@ -255,7 +262,7 @@ export function TaskBoard({ tasks, memberName, testMode, view, projectId }: Task
         if (executorDifference !== 0) return executorDifference;
         return left.title.localeCompare(right.title, "uk") || (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31");
       });
-  }, [items, projectId, search, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, selectedStatuses, view]);
+  }, [items, memberId, projectId, search, selectedAreas, selectedHorizons, selectedAuthors, selectedExecutors, selectedContainers, selectedStatuses, view]);
 
   const reportRows = useMemo<readonly ReportRow[]>(() => visibleTasks.map((task, index) => {
     const previous = visibleTasks[index - 1];
