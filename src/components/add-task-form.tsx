@@ -21,6 +21,7 @@ type FormValues = {
   spaceId: string;
   projectId: string;
   participantIds: string[];
+  assigneeId: string;
 };
 
 type FormErrors = Partial<Pick<FormValues, "title" | "goal" | "plannedStartDate" | "dueDate">>;
@@ -35,7 +36,7 @@ type AddTaskFormProps = Readonly<{
 }>;
 
 const initialValues: FormValues = {
-  title: "", goal: "", area: "family", horizon: "tactical", plannedStartDate: "", dueDate: "", containerKind: "space", spaceId: "", projectId: "", participantIds: [],
+  title: "", goal: "", area: "family", horizon: "tactical", plannedStartDate: "", dueDate: "", containerKind: "space", spaceId: "", projectId: "", participantIds: [], assigneeId: "",
 };
 
 function validate(values: FormValues): FormErrors {
@@ -74,26 +75,32 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
     : spaces.find((space) => space.id === values.spaceId) ?? spaces[0] ?? null;
   const availableParticipants = selectedSpace?.members.filter((member) => member.id !== currentMember.id) ?? [];
 
-  function updateValue<Field extends Exclude<keyof FormValues, "participantIds">>(field: Field, value: FormValues[Field]) {
+  const assigneeMembers = useMemo(() => {
+    const members = [currentMember, ...availableParticipants];
+    return members.filter((member, index) => members.findIndex((candidate) => candidate.id === member.id) === index);
+  }, [availableParticipants, currentMember]);
+  const selectedAssignee = assigneeMembers.find((member) => member.id === values.assigneeId) ?? currentMember;
+
+  function updateValue<Field extends Exclude<keyof FormValues, "participantIds" | "assigneeId">>(field: Field, value: FormValues[Field]) {
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
     setSubmissionError("");
   }
 
   function updateContainerKind(containerKind: ContainerKind) {
-    setValues((current) => ({ ...current, containerKind, participantIds: [] }));
+    setValues((current) => ({ ...current, containerKind, participantIds: [], assigneeId: "" }));
     setSubmissionError("");
   }
 
   function updateSpace(spaceId: string) {
     const space = spaces.find((item) => item.id === spaceId);
-    setValues((current) => ({ ...current, spaceId, participantIds: [], area: space?.kind === "workspace" ? "work" : current.area }));
+    setValues((current) => ({ ...current, spaceId, participantIds: [], assigneeId: "", area: space?.kind === "workspace" ? "work" : current.area }));
     setSubmissionError("");
   }
 
   function updateProject(projectId: string) {
     const project = activeProjects.find((item) => item.id === projectId);
-    setValues((current) => ({ ...current, projectId, participantIds: [], area: project?.scopeKind === "workspace" ? "work" : current.area }));
+    setValues((current) => ({ ...current, projectId, participantIds: [], assigneeId: "", area: project?.scopeKind === "workspace" ? "work" : current.area }));
     setSubmissionError("");
   }
 
@@ -101,6 +108,18 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
     setValues((current) => ({
       ...current,
       participantIds: current.participantIds.includes(memberId) ? current.participantIds.filter((id) => id !== memberId) : [...current.participantIds, memberId],
+      assigneeId: current.assigneeId === memberId && current.participantIds.includes(memberId) ? "" : current.assigneeId,
+    }));
+    setSubmissionError("");
+  }
+
+  function selectAssignee(memberId: string) {
+    setValues((current) => ({
+      ...current,
+      assigneeId: memberId,
+      participantIds: memberId && memberId !== currentMember.id && !current.participantIds.includes(memberId)
+        ? [...current.participantIds, memberId]
+        : current.participantIds,
     }));
     setSubmissionError("");
   }
@@ -120,7 +139,7 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
     const task: Task = {
       id: window.crypto.randomUUID(), title: values.title.trim(), goal: values.goal.trim() || null, area: values.area, horizon: values.horizon, plannedStartDate: values.plannedStartDate || null, dueDate: values.dueDate || null, actualStartedAt: null,
       progressPercent: 0, executionNote: null, executionUpdatedAt: null,
-      status: "active", postponedUntil: null, createdByName: currentMember.name, createdAt: new Date().toISOString(), completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null,
+      status: "active", postponedUntil: null, createdById: currentMember.id, createdByName: currentMember.name, assigneeId: selectedAssignee.id, assigneeName: selectedAssignee.name, createdAt: new Date().toISOString(), completedBy: null, completedAt: null, rejectedBy: null, rejectedAt: null,
       participants: selectedParticipants, scopeKind: selectedSpace.kind, scopeId: selectedSpace.id, scopeName: selectedSpace.name,
       projectId: values.containerKind === "project" ? selectedProject?.id ?? null : null,
       projectName: values.containerKind === "project" ? selectedProject?.name ?? null : null,
@@ -152,14 +171,22 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
       return;
     }
     if (typeof createdTaskId === "string") {
-      if (task.plannedStartDate) {
-        const { error: timelineError } = await supabase
+      const extraFields: Record<string, string> = {};
+      if (task.plannedStartDate) extraFields.planned_start_date = task.plannedStartDate;
+      if (selectedAssignee.id !== currentMember.id) {
+        extraFields.assignee_user_id = selectedAssignee.id;
+        extraFields.assignee_name = selectedAssignee.name;
+      }
+
+      if (Object.keys(extraFields).length > 0) {
+        const { error: extraFieldsError } = await supabase
           .from("tasks")
-          .update({ planned_start_date: task.plannedStartDate })
+          .update(extraFields)
           .eq("id", createdTaskId);
 
-        if (timelineError) {
-          setSubmissionError("Задачу створено, але плановий старт не збережено. Виконайте supabase/task-gantt.sql, відкрийте задачу й вкажіть старт у редагуванні.");
+        if (extraFieldsError) {
+          const neededFiles = [task.plannedStartDate ? "supabase/task-gantt.sql" : null, selectedAssignee.id !== currentMember.id ? "supabase/task-assignee.sql" : null].filter((file): file is string => file !== null);
+          setSubmissionError(`Задачу створено, але не збережено додаткові дані. Виконайте ${neededFiles.join(" та ")} у Supabase SQL Editor, відкрийте задачу й повторіть зміну.`);
           setIsSubmitting(false);
           return;
         }
@@ -231,6 +258,14 @@ export function AddTaskForm({ currentMember, spaces, projects, projectsSetupErro
             {availableParticipants.map((member) => <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-stone-200 px-4 text-sm font-medium text-stone-800" key={member.id}><input checked={values.participantIds.includes(member.id)} className="size-4 accent-amber-800" onChange={() => toggleParticipant(member.id)} type="checkbox" />{member.name}</label>)}
           </div>
           {availableParticipants.length === 0 ? <p className="mt-3 text-sm text-stone-500">Інших активних учасників у вибраному просторі поки немає. Задача буде особистою.</p> : null}
+        </fieldset>
+
+        <fieldset>
+          <legend className="text-sm font-semibold text-stone-900">Відповідальний за виконання</legend>
+          <p className="mt-1 text-sm text-stone-500">За замовчуванням — ви, автор. Відповідальний автоматично додається до учасників задачі.</p>
+          <select className={fieldClass} id="task-assignee" onChange={(event) => selectAssignee(event.target.value)} value={selectedAssignee.id}>
+            {assigneeMembers.map((member) => <option key={member.id} value={member.id}>{member.name}{member.id === currentMember.id ? " — ви, автор" : ""}</option>)}
+          </select>
         </fieldset>
       </div>
       {submissionError ? <p className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-900" role="alert">{submissionError}</p> : null}

@@ -102,7 +102,7 @@ function toggleChoice<T extends string>(current: readonly T[], choice: T) {
 }
 
 function peopleForTask(task: Task) {
-  return Array.from(new Set([task.createdByName, ...task.participants.map((participant) => participant.name)]));
+  return Array.from(new Set([task.assigneeName ?? task.createdByName, ...task.participants.map((participant) => participant.name)]));
 }
 
 function projectOptionsForTasks(tasks: readonly Task[]) {

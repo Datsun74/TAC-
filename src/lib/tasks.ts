@@ -21,7 +21,10 @@ type TaskRow = {
   execution_updated_at?: string | null;
   status: TaskStatus;
   postponed_until: string | null;
+  created_by: string;
   created_by_name: string;
+  assignee_user_id?: string | null;
+  assignee_name?: string | null;
   created_at: string;
   completed_by: string | null;
   completed_at: string | null;
@@ -98,7 +101,10 @@ function mapTask(row: TaskRow): Task {
     executionUpdatedAt: row.execution_updated_at ?? null,
     status: row.status,
     postponedUntil: row.postponed_until,
+    createdById: row.created_by,
     createdByName: row.created_by_name,
+    assigneeId: row.assignee_user_id ?? null,
+    assigneeName: row.assignee_name ?? null,
     createdAt: row.created_at,
     completedBy: row.completed_by,
     completedAt: row.completed_at,
@@ -113,8 +119,9 @@ function mapTask(row: TaskRow): Task {
   };
 }
 
-const taskFields = "id, title, goal, area, horizon, planned_start_date, due_date, actual_started_at, progress_percent, execution_note, execution_updated_at, status, postponed_until, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, project_id, families(name), task_workspaces(name), task_projects(name), task_participants(member_user_id, member_name)";
-const legacyTaskFields = "id, title, goal, area, horizon, due_date, status, postponed_until, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, families(name), task_workspaces(name), task_participants(member_user_id, member_name)";
+const taskFieldsWithoutAssignee = "id, title, goal, area, horizon, planned_start_date, due_date, actual_started_at, progress_percent, execution_note, execution_updated_at, status, postponed_until, created_by, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, project_id, families(name), task_workspaces(name), task_projects(name), task_participants(member_user_id, member_name)";
+const taskFields = taskFieldsWithoutAssignee.replace("created_by, created_by_name", "created_by, created_by_name, assignee_user_id, assignee_name");
+const legacyTaskFields = "id, title, goal, area, horizon, due_date, status, postponed_until, created_by, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, families(name), task_workspaces(name), task_participants(member_user_id, member_name)";
 
 function shouldUseLegacyTaskFields(error: { code?: string; message?: string } | null) {
   return error?.code === "42703" || error?.code === "PGRST200" || error?.message?.includes("project") === true;
@@ -132,6 +139,17 @@ export async function getTasks(statuses: readonly TaskStatus[]): Promise<TasksRe
     .order("created_at", { ascending: false });
   let data: unknown = initialResult.data;
   let error: { code?: string; message?: string } | null = initialResult.error;
+
+  if (shouldUseLegacyTaskFields(error)) {
+    const withoutAssigneeResult = await supabase
+      .from("tasks")
+      .select(taskFieldsWithoutAssignee)
+      .in("status", [...statuses])
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false });
+    data = withoutAssigneeResult.data;
+    error = withoutAssigneeResult.error;
+  }
 
   if (shouldUseLegacyTaskFields(error)) {
     const legacyResult = await supabase
@@ -178,6 +196,17 @@ export async function getTaskExecutionSetupError(): Promise<string | null> {
   return error ? "Виконайте файл supabase/task-execution.sql у Supabase SQL Editor, щоб вести відсоток, етап виконання та переносити строки з картки задачі." : null;
 }
 
+export async function getTaskAssigneeSetupError(): Promise<string | null> {
+  await getTaskUserContext();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tasks")
+    .select("assignee_user_id, assignee_name")
+    .limit(1);
+
+  return error ? "Щоб призначати відповідального, виконайте файл supabase/task-assignee.sql у Supabase SQL Editor." : null;
+}
+
 export async function getTaskDetail(taskId: string, includeAttachments = false): Promise<TaskDetailResult> {
   await getTaskUserContext();
   const supabase = await createClient();
@@ -188,6 +217,16 @@ export async function getTaskDetail(taskId: string, includeAttachments = false):
     .maybeSingle();
   let data: unknown = initialResult.data;
   let error: { code?: string; message?: string } | null = initialResult.error;
+
+  if (shouldUseLegacyTaskFields(error)) {
+    const withoutAssigneeResult = await supabase
+      .from("tasks")
+      .select(taskFieldsWithoutAssignee)
+      .eq("id", taskId)
+      .maybeSingle();
+    data = withoutAssigneeResult.data;
+    error = withoutAssigneeResult.error;
+  }
 
   if (shouldUseLegacyTaskFields(error)) {
     const legacyResult = await supabase

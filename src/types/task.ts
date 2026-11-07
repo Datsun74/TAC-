@@ -31,7 +31,10 @@ export type Task = Readonly<{
   executionUpdatedAt: string | null;
   status: TaskStatus;
   postponedUntil: string | null;
+  createdById: string;
   createdByName: string;
+  assigneeId: string | null;
+  assigneeName: string | null;
   createdAt: string;
   completedBy: string | null;
   completedAt: string | null;

@@ -5,12 +5,13 @@ import { TaskChecklist } from "@/components/task-checklist";
 import { TaskComments } from "@/components/task-comments";
 import { TaskDetailStatus } from "@/components/task-detail-status";
 import { TaskEditor } from "@/components/task-editor";
+import { TaskAssigneeEditor } from "@/components/task-assignee-editor";
 import { TaskExecutionProgress } from "@/components/task-execution-progress";
 import { TaskParticipantsEditor } from "@/components/task-participants-editor";
 import { getTaskUserContext } from "@/lib/task-access";
 import { formatTaskDate, taskAreaLabels, taskHorizonLabels, taskStatusLabels } from "@/lib/task-options";
 import { isLocalTestMode } from "@/lib/test-mode";
-import { getTaskDetail, getTaskExecutionSetupError, getTaskFormContext } from "@/lib/tasks";
+import { getTaskAssigneeSetupError, getTaskDetail, getTaskExecutionSetupError, getTaskFormContext } from "@/lib/tasks";
 
 function formatTaskTimestamp(value: string) {
   return new Intl.DateTimeFormat("uk-UA", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(value));
@@ -30,7 +31,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
     );
   }
 
-  const [member, result, formContext, executionSetupError] = await Promise.all([getTaskUserContext(), getTaskDetail(taskId), getTaskFormContext(), getTaskExecutionSetupError()]);
+  const [member, result, formContext, executionSetupError, assigneeSetupError] = await Promise.all([getTaskUserContext(), getTaskDetail(taskId), getTaskFormContext(), getTaskExecutionSetupError(), getTaskAssigneeSetupError()]);
 
   if (!result.task) {
     if (result.error) {
@@ -74,6 +75,7 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
         {task.goal ? <p className="mt-5 whitespace-pre-wrap leading-7 text-stone-700">{task.goal}</p> : <p className="mt-5 text-stone-500">Кінцеву мету не вказано.</p>}
         <dl className="mt-7 grid gap-5 border-t border-stone-100 pt-5 text-sm sm:grid-cols-2">
           <div><dt className="text-stone-500">Створив</dt><dd className="mt-1 font-semibold text-stone-800">{task.createdByName}</dd></div>
+          <div><dt className="text-stone-500">Відповідальний</dt><dd className="mt-1 font-semibold text-stone-800">{task.assigneeName ?? task.createdByName}</dd></div>
           <div><dt className="text-stone-500">План</dt><dd className="mt-1 font-semibold text-stone-800">{task.plannedStartDate ? formatTaskDate(task.plannedStartDate) : "Старт не встановлено"} — {task.dueDate ? formatTaskDate(task.dueDate) : "завершення не встановлено"}</dd></div>
           {task.actualStartedAt ? <div><dt className="text-stone-500">Фактичний старт</dt><dd className="mt-1 font-semibold text-stone-800">{formatTaskTimestamp(task.actualStartedAt)}</dd></div> : null}
           {task.projectName ? <div><dt className="text-stone-500">Постійний простір</dt><dd className="mt-1 font-semibold text-stone-800">{task.scopeName}</dd></div> : null}
@@ -89,7 +91,8 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           {result.activityError ? <p className="mt-4 rounded-xl bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">{result.activityError}</p> : null}
         </section>
         <TaskEditor task={task} />
-        <TaskParticipantsEditor availableMembers={taskSpace?.members ?? []} createdByName={task.createdByName} initialParticipants={task.participants} setupError={formContext.error} taskId={task.id} />
+        <TaskAssigneeEditor availableMembers={taskSpace?.members ?? []} initialParticipants={task.participants} setupError={assigneeSetupError} task={task} />
+        <TaskParticipantsEditor assigneeId={task.assigneeId} availableMembers={taskSpace?.members ?? []} createdById={task.createdById} createdByName={task.createdByName} initialParticipants={task.participants} setupError={formContext.error} taskId={task.id} />
         <TaskDetailStatus actualStartedAt={task.actualStartedAt} memberName={member.displayName} postponedUntil={task.postponedUntil} status={task.status} taskId={task.id} />
       </div>
       <TaskChecklist
