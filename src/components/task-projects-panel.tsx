@@ -21,13 +21,27 @@ function projectStatusLabel(project: TaskProject) {
   return project.status === "active" ? "Активний" : "Закритий";
 }
 
+function currentDate() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function projectSummary(projectId: string, tasks: readonly Task[]) {
   const projectTasks = tasks.filter((task) => task.projectId === projectId);
+  const measurableTasks = projectTasks.filter((task) => task.status !== "rejected");
+  const today = currentDate();
+  const overdue = projectTasks.filter((task) => {
+    if (task.status === "completed" || task.status === "rejected") return false;
+    const deadline = task.status === "postponed" ? task.postponedUntil : task.dueDate;
+    return deadline !== null && deadline < today;
+  }).length;
   return {
     total: projectTasks.length,
     active: projectTasks.filter((task) => task.status === "active").length,
     inProgress: projectTasks.filter((task) => task.status === "in_work" || task.status === "in_progress").length,
     completed: projectTasks.filter((task) => task.status === "completed").length,
+    overdue,
+    progress: measurableTasks.length === 0 ? 0 : Math.round(measurableTasks.reduce((total, task) => total + (task.status === "completed" ? 100 : task.progressPercent), 0) / measurableTasks.length),
   };
 }
 
@@ -98,7 +112,7 @@ export function TaskProjectsPanel({ currentMember, spaces, projects, tasks, setu
             {projects.map((project) => {
               const summary = projectSummary(project.id, tasks);
               return <li className="flex flex-wrap items-center justify-between gap-3 py-4" key={project.id}>
-              <div className="min-w-0"><h3 className="font-semibold text-stone-950">{project.name}</h3><p className="mt-1 text-sm text-stone-600">{project.scopeKind === "workspace" ? "Робота" : "Сім’я"}: {project.scopeName} · {taskHorizonLabels[project.horizon]}</p><p className="mt-1 text-xs leading-5 text-stone-500">Задач: {summary.total} · у роботі: {summary.inProgress} · активних: {summary.active} · виконано: {summary.completed}</p></div>
+              <div className="min-w-0 flex-1"><h3 className="font-semibold text-stone-950">{project.name}</h3><p className="mt-1 text-sm text-stone-600">{project.scopeKind === "workspace" ? "Робота" : "Сім’я"}: {project.scopeName} · {taskHorizonLabels[project.horizon]}</p><p className="mt-1 text-xs leading-5 text-stone-500">Задач: {summary.total} · у роботі: {summary.inProgress} · активних: {summary.active} · виконано: {summary.completed}{summary.overdue > 0 ? <span className="font-semibold text-red-700"> · прострочено: {summary.overdue}</span> : null}</p><div className="mt-2 max-w-md"><div className="flex items-center justify-between gap-3 text-xs font-semibold text-stone-600"><span>Готовність за задачами</span><span className="text-stone-900">{summary.progress}%</span></div><div aria-label={`Готовність проєкту ${summary.progress}%`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={summary.progress} className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-200" role="progressbar"><div className="h-full rounded-full bg-emerald-600 transition-[width]" style={{ width: `${summary.progress}%` }} /></div></div></div>
               <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${project.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-stone-100 text-stone-600"}`}>{projectStatusLabel(project)}</span><Link className="inline-flex min-h-9 items-center rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-100" href={`/tasks/list?project=${encodeURIComponent(project.id)}`}>Задачі</Link>{project.status === "active" ? <button className="min-h-9 rounded-full border border-stone-300 px-3 text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60" disabled={closingId === project.id} onClick={() => void closeProject(project.id)} type="button">{closingId === project.id ? "Закриваємо…" : "Закрити"}</button> : null}</div>
             </li>;
             })}
