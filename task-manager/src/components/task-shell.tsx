@@ -19,6 +19,7 @@ const navigation = [
   { href: "/tasks/list", label: "Усі задачі", mobileLabel: "Усі", symbol: "≡" },
   { href: "/tasks/board", label: "Дошка", mobileLabel: "Дошка", symbol: "▦" },
   { href: "/tasks/gantt", label: "Гант", mobileLabel: "Гант", symbol: "▤" },
+  { href: "/tasks/hoshin", label: "Хошин", mobileLabel: "Хошин", symbol: "◇" },
   { href: "/tasks/add", label: "Нова задача", mobileLabel: "Додати", symbol: "+" },
   { href: "/tasks/history", label: "Історія", mobileLabel: "Історія", symbol: "✓" },
   { href: "/tasks/workspaces", label: "Простори", mobileLabel: "Простори", symbol: "◌" },

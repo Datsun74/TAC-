@@ -7,6 +7,7 @@ export const taskNavigationItems: NavigationItem[] = [
   { label: "Усі задачі", mobileLabel: "Усі", href: "/tasks/list" },
   { label: "Дошка", mobileLabel: "Дошка", href: "/tasks/board" },
   { label: "Гант", mobileLabel: "Гант", href: "/tasks/gantt" },
+  { label: "Хошин", mobileLabel: "Хошин", href: "/tasks/hoshin" },
   { label: "Нова задача", mobileLabel: "Додати", href: "/tasks/add" },
   { label: "Історія", mobileLabel: "Історія", href: "/tasks/history" },
   { label: "Простори", mobileLabel: "Простори", href: "/tasks/workspaces" },

@@ -127,6 +127,39 @@ export type TaskComment = Readonly<{
   createdAt: string;
 }>;
 
+export type TaskHoshinNodeLevel = "division" | "department";
+
+export type TaskHoshinPlan = Readonly<{
+  taskId: string;
+  action: string;
+  metricName: string;
+  metricTarget: string;
+  ownerName: string;
+  executorComment: string;
+  proposedMetric: string;
+  proposalAuthorName: string | null;
+  proposalUpdatedAt: string | null;
+  updatedAt: string;
+}>;
+
+export type TaskHoshinNode = Readonly<{
+  id: string;
+  taskId: string;
+  parentId: string | null;
+  level: TaskHoshinNodeLevel;
+  title: string;
+  action: string;
+  metricName: string;
+  metricTarget: string;
+  ownerName: string;
+  executorComment: string;
+  proposedMetric: string;
+  proposalAuthorName: string | null;
+  proposalUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
 export function isTaskArea(value: string): value is TaskArea {
   return (taskAreas as readonly string[]).includes(value);
 }
