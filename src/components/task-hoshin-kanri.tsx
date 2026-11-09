@@ -121,27 +121,54 @@ function MetricLine({ metricName, metricTarget }: Readonly<{ metricName: string;
   return <p className="mt-2 text-xs leading-5 text-stone-600"><span className="font-semibold text-stone-700">{metricName || "Метрика"}</span>{metricTarget ? `: ${metricTarget}` : ""}</p>;
 }
 
+function shortText(value: string, fallback: string) {
+  const normalized = value.trim();
+  if (!normalized) return fallback;
+  return normalized.length > 150 ? `${normalized.slice(0, 147)}…` : normalized;
+}
+
 function HoshinRelationshipMap({ nodes, plan, task }: Readonly<{
   nodes: readonly TaskHoshinNode[];
   plan: TaskHoshinPlan | undefined;
   task: Task;
 }>) {
   const divisions = nodes.filter((node) => node.level === "division");
-  const departmentsFor = (divisionId: string) => nodes.filter((node) => node.level === "department" && node.parentId === divisionId);
+  const [selectedDivisionId, setSelectedDivisionId] = useState<string | null>(null);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
+  const selectedDivision = divisions.find((division) => division.id === selectedDivisionId) ?? null;
+  const departments = selectedDivision ? nodes.filter((node) => node.level === "department" && node.parentId === selectedDivision.id) : [];
+  const selectedDepartment = departments.find((department) => department.id === selectedDepartmentId) ?? null;
   const centralOwner = plan?.ownerName || task.createdByName;
+  const selectedInfo = selectedDepartment ?? selectedDivision;
+
+  function openDivision(divisionId: string) {
+    setSelectedDivisionId(divisionId);
+    setSelectedDepartmentId(null);
+  }
+
+  function returnToCentral() {
+    setSelectedDivisionId(null);
+    setSelectedDepartmentId(null);
+  }
 
   return (
     <section className="rounded-3xl border border-violet-200 bg-violet-50/50 p-4 shadow-sm sm:p-5" aria-labelledby="hoshin-map-title">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold tracking-[0.14em] text-violet-800 uppercase">Візуальна карта</p>
-          <h2 className="mt-1 text-xl font-bold text-stone-950" id="hoshin-map-title">Взаємозв’язок цілі та відповідальних</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-stone-600">Лінії показують, який підрозділ та відділ працює на центральну стратегічну ціль. Натисніть на блок, щоб перейти до його редагування.</p>
+          <p className="text-xs font-bold tracking-[0.14em] text-violet-800 uppercase">Карта A3</p>
+          <h2 className="mt-1 text-xl font-bold text-stone-950" id="hoshin-map-title">Взаємозв’язок цілі, підрозділів і відділів</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-stone-600">Відкривайте підкарти підрозділів, щоб бачити їхні відділи та коротку інформацію. Карта не замінює редагування — вона показує зв’язки на одному екрані.</p>
         </div>
         <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-bold text-violet-900">{divisions.length} підрозділів</span>
       </div>
 
-      <div className="mt-5">
+      <nav aria-label="Навігація картою Хошин" className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <button className={`rounded-lg px-3 py-2 font-semibold transition ${selectedDivision ? "bg-white text-violet-800 hover:bg-violet-100" : "bg-violet-700 text-white"}`} onClick={returnToCentral} type="button">Центральна карта</button>
+        {selectedDivision ? <><span aria-hidden="true" className="text-stone-400">›</span><button className="rounded-lg bg-sky-100 px-3 py-2 font-semibold text-sky-900" onClick={() => setSelectedDepartmentId(null)} type="button">{selectedDivision.title}</button></> : null}
+        {selectedDepartment ? <><span aria-hidden="true" className="text-stone-400">›</span><span className="rounded-lg bg-white px-3 py-2 font-semibold text-stone-800">{selectedDepartment.title}</span></> : null}
+      </nav>
+
+      {!selectedDivision ? <div className="mt-5">
         <div className="mx-auto max-w-xl rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-center shadow-sm">
           <p className="text-[11px] font-bold tracking-[0.14em] text-amber-800 uppercase">Центральна ціль</p>
           <a className="mt-1 block font-bold text-stone-950 hover:text-amber-900 hover:underline" href={`#hoshin-central-${task.id}`}>{task.title}</a>
@@ -149,31 +176,44 @@ function HoshinRelationshipMap({ nodes, plan, task }: Readonly<{
           <MetricLine metricName={plan?.metricName ?? ""} metricTarget={plan?.metricTarget ?? ""} />
         </div>
         <div aria-hidden="true" className="mx-auto h-6 w-px bg-violet-300" />
-
         {divisions.length === 0 ? <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-violet-300 bg-white/80 px-4 py-5 text-center text-sm leading-6 text-stone-600">Додайте перший підрозділ нижче — він з’явиться на цій карті та буде пов’язаний із центральною ціллю.</div> : <><div aria-hidden="true" className="relative hidden h-5 md:block"><span className="absolute top-0 right-[12%] left-[12%] h-px bg-violet-300" /></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {divisions.map((division) => {
-            const departments = departmentsFor(division.id);
-            return <article className="relative rounded-2xl border border-sky-200 bg-white p-3 shadow-sm" key={division.id}>
+            const departmentCount = nodes.filter((node) => node.level === "department" && node.parentId === division.id).length;
+            return <button className="relative rounded-2xl border border-sky-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-violet-400 hover:shadow-md focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:outline-none" key={division.id} onClick={() => openDivision(division.id)} type="button">
               <div aria-hidden="true" className="absolute -top-4 left-1/2 h-4 w-px -translate-x-1/2 bg-violet-300 md:hidden" />
               <div aria-hidden="true" className="absolute -top-5 left-1/2 hidden h-5 w-px -translate-x-1/2 bg-violet-300 md:block" />
-              <p className="text-[11px] font-bold tracking-[0.12em] text-sky-800 uppercase">Підрозділ</p>
-              <a className="mt-1 block font-bold text-stone-950 hover:text-sky-800 hover:underline" href={`#hoshin-node-${division.id}`}>{division.title}</a>
-              <p className="mt-1 text-xs text-stone-600">Власник: {division.ownerName || "не визначено"}</p>
+              <p className="text-[11px] font-bold tracking-[0.12em] text-sky-800 uppercase">Підрозділ · підкарта</p>
+              <span className="mt-1 block text-base font-bold text-stone-950">{division.title}</span>
+              <span className="mt-2 block text-xs leading-5 text-stone-600">{shortText(division.action, "Дію ще не описано")}</span>
+              <span className="mt-2 block text-xs text-stone-600">Власник: {division.ownerName || "не визначено"}</span>
               <MetricLine metricName={division.metricName} metricTarget={division.metricTarget} />
-              <div className="mt-3 border-t border-sky-100 pt-3">
-                <p className="text-[11px] font-bold tracking-[0.12em] text-stone-500 uppercase">Відділи · {departments.length}</p>
-                {departments.length === 0 ? <p className="mt-2 text-xs text-stone-500">Поки не додано.</p> : <div className="mt-2 space-y-2">
-                  {departments.map((department) => <a className="block rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm transition hover:border-violet-300 hover:bg-violet-50" href={`#hoshin-node-${department.id}`} key={department.id}>
-                    <span className="font-semibold text-stone-900">{department.title}</span>
-                    <span className="mt-1 block text-xs text-stone-600">{department.ownerName ? `Відповідальний: ${department.ownerName}` : "Відповідального ще не вказано"}</span>
-                    {(department.metricName || department.metricTarget) ? <span className="mt-1 block text-xs text-stone-600">{department.metricName || "Метрика"}{department.metricTarget ? `: ${department.metricTarget}` : ""}</span> : null}
-                  </a>)}
-                </div>}
-              </div>
-            </article>;
+              <span className="mt-3 flex items-center justify-between border-t border-sky-100 pt-3 text-sm font-bold text-violet-800"><span>{departmentCount} відділів</span><span>Відкрити →</span></span>
+            </button>;
           })}
         </div></>}
-      </div>
+      </div> : <div className="mt-5">
+        <div className="mx-auto max-w-2xl rounded-2xl border-2 border-sky-400 bg-sky-50 p-4 text-center shadow-sm">
+          <p className="text-[11px] font-bold tracking-[0.14em] text-sky-800 uppercase">Підкарта підрозділу</p>
+          <a className="mt-1 block font-bold text-stone-950 hover:text-sky-800 hover:underline" href={`#hoshin-node-${selectedDivision.id}`}>{selectedDivision.title}</a>
+          <p className="mt-1 text-xs text-stone-600">Власник: {selectedDivision.ownerName || "не визначено"}</p>
+          <MetricLine metricName={selectedDivision.metricName} metricTarget={selectedDivision.metricTarget} />
+        </div>
+        <div aria-hidden="true" className="mx-auto h-6 w-px bg-sky-300" />
+        {departments.length === 0 ? <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-sky-300 bg-white/80 px-4 py-5 text-center text-sm leading-6 text-stone-600">У цьому підрозділі ще немає відділів. Додайте їх у редакторі нижче.</div> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {departments.map((department) => <button className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-violet-400 hover:shadow-md focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:outline-none ${selectedDepartment?.id === department.id ? "border-violet-500 ring-2 ring-violet-100" : "border-stone-200"}`} key={department.id} onClick={() => setSelectedDepartmentId(department.id)} type="button">
+            <p className="text-[11px] font-bold tracking-[0.12em] text-stone-500 uppercase">Відділ · коротка карта</p>
+            <span className="mt-1 block text-base font-bold text-stone-950">{department.title}</span>
+            <span className="mt-2 block text-xs leading-5 text-stone-600">{shortText(department.action, "Дію ще не описано")}</span>
+            <span className="mt-2 block text-xs text-stone-600">Власник: {department.ownerName || "не визначено"}</span>
+            <MetricLine metricName={department.metricName} metricTarget={department.metricTarget} />
+          </button>)}
+        </div>}
+      </div>}
+
+      {selectedInfo ? <aside aria-live="polite" className="mt-5 rounded-2xl border border-violet-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-bold tracking-[0.14em] text-violet-800 uppercase">Коротка інформація · {selectedInfo.level === "division" ? "підрозділ" : "відділ"}</p><h3 className="mt-1 text-lg font-bold text-stone-950">{selectedInfo.title}</h3></div><a className="w-fit rounded-lg border border-violet-300 px-3 py-2 text-sm font-bold text-violet-900 hover:bg-violet-50" href={`#hoshin-node-${selectedInfo.id}`}>Редагувати цей рівень</a></div>
+        <dl className="mt-3 grid gap-3 text-sm leading-6 sm:grid-cols-2"><div><dt className="font-bold text-stone-900">Що потрібно зробити</dt><dd className="mt-1 text-stone-600">{shortText(selectedInfo.action, "Ще не заповнено")}</dd></div><div><dt className="font-bold text-stone-900">Власник і метрика</dt><dd className="mt-1 text-stone-600">{selectedInfo.ownerName || "Власника ще не вказано"}<br />{selectedInfo.metricName || "Метрика ще не визначена"}{selectedInfo.metricTarget ? `: ${selectedInfo.metricTarget}` : ""}</dd></div><div><dt className="font-bold text-stone-900">Коментар виконавця</dt><dd className="mt-1 text-stone-600">{shortText(selectedInfo.executorComment, "Коментаря поки немає")}</dd></div><div><dt className="font-bold text-stone-900">Запропонована метрика</dt><dd className="mt-1 text-stone-600">{selectedInfo.proposedMetric || "Поки не запропоновано"}</dd></div></dl>
+      </aside> : null}
     </section>
   );
 }
