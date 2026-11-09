@@ -14,6 +14,8 @@ create table if not exists public.tasks (
   area text not null check (area in ('work', 'family', 'personal')),
   horizon text not null check (horizon in ('strategic', 'operational', 'tactical')),
   due_date date,
+  daily_plan_date date,
+  daily_plan_hour smallint,
   status text not null default 'active' check (status in ('active', 'in_work', 'in_progress', 'completed', 'rejected', 'postponed')),
   postponed_until date,
   completed_by text check (completed_by is null or char_length(btrim(completed_by)) between 2 and 80),
@@ -28,6 +30,10 @@ create table if not exists public.tasks (
     or (status = 'postponed' and postponed_until is not null and completed_by is null and completed_at is null and rejected_by is null and rejected_at is null)
     or (status = 'completed' and postponed_until is null and completed_by is not null and completed_at is not null and rejected_by is null and rejected_at is null)
     or (status = 'rejected' and postponed_until is null and completed_by is null and completed_at is null and rejected_by is not null and rejected_at is not null)
+  ),
+  constraint tasks_daily_plan_metadata_matches check (
+    (daily_plan_date is null and daily_plan_hour is null)
+    or (daily_plan_date is not null and daily_plan_hour between 8 and 20)
   )
 );
 
@@ -41,6 +47,10 @@ create table if not exists public.task_participants (
 
 create index if not exists tasks_family_status_due_idx
   on public.tasks (family_id, status, due_date asc nulls last, created_at desc);
+
+create index if not exists tasks_daily_plan_date_hour_idx
+  on public.tasks (daily_plan_date, daily_plan_hour)
+  where daily_plan_date is not null;
 
 create index if not exists task_participants_member_idx
   on public.task_participants (member_user_id, task_id);
@@ -138,5 +148,30 @@ create policy "task creators can add participants"
 create policy "task creators can remove participants"
   on public.task_participants for delete to authenticated
   using (public.can_access_task(task_id));
+
+create or replace function public.normalize_task_daily_plan()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  -- "Сьогодні" та "Завтра" — це лише денний план поверх стану "У процесі".
+  -- Після зміни базового стану старе бронювання дня не має повертати задачу до плану.
+  if new.status not in ('in_progress', 'completed') then
+    new.daily_plan_date := null;
+    new.daily_plan_hour := null;
+  elsif TG_OP = 'UPDATE' and new.status = 'in_progress' and old.status <> 'in_progress' then
+    new.daily_plan_date := null;
+    new.daily_plan_hour := null;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists normalize_task_daily_plan_before_write on public.tasks;
+create trigger normalize_task_daily_plan_before_write
+  before insert or update of status, daily_plan_date, daily_plan_hour on public.tasks
+  for each row execute function public.normalize_task_daily_plan();
 
 commit;

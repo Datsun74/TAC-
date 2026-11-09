@@ -248,7 +248,7 @@ export function TaskKanbanBoard({ tasks, memberName, testMode }: TaskKanbanBoard
 
     return (
       <section className={`${columnStyle(status)} ${isDropTarget ? "ring-2 ring-amber-700 ring-offset-1" : ""} min-w-0 rounded-xl border p-2 transition-shadow`} key={status} onDragOver={(event) => allowDrop(event, status, targetKey, group.tasks.map((task) => task.id))} onDrop={(event) => dropTask(event, status, group.tasks.map((task) => task.id))}>
-        <div className="flex items-center justify-between gap-1"><h3 className="min-w-0 text-xs font-semibold leading-4 text-stone-950">{taskStatusLabels[status]}</h3><span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-stone-700">{columnTasks.length}</span></div>
+        <div className="flex items-center justify-between gap-1"><h3 className="min-w-0 text-xs font-semibold leading-4 text-stone-950">{taskStatusLabels[status]}</h3><div className="flex shrink-0 items-center gap-1"><span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-stone-700">{columnTasks.length}</span>{status === "in_progress" ? <Link className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-100" href="/tasks">День</Link> : null}</div></div>
         {columnTasks.length > 0 ? <div className="mt-2 space-y-2">{columnTasks.map((task) => <TaskCard isMoving={movingTaskId === task.id} key={task.id} onDragEnd={() => { setDraggedTaskId(null); setDropTargetKey(null); }} onDragStart={startDragging} task={task} testMode={testMode} />)}</div> : <p className="mt-2 rounded-lg bg-white/70 px-2 py-2 text-[11px] leading-4 text-stone-500">Перетягніть сюди</p>}
       </section>
     );

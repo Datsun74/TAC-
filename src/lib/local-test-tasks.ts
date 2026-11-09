@@ -24,6 +24,8 @@ function exampleTasks(): Task[] {
       horizon: "tactical",
       plannedStartDate: dateOffset(-2),
       dueDate: dateOffset(0),
+      dailyPlanDate: dateOffset(0),
+      dailyPlanHour: 10,
       actualStartedAt: createdAt,
       progressPercent: 55,
       executionNote: "Зібрано листя біля гаража; залишилися гілки.",
@@ -54,6 +56,8 @@ function exampleTasks(): Task[] {
       horizon: "operational",
       plannedStartDate: dateOffset(1),
       dueDate: dateOffset(3),
+      dailyPlanDate: null,
+      dailyPlanHour: null,
       actualStartedAt: null,
       progressPercent: 0,
       executionNote: null,
@@ -84,6 +88,8 @@ function exampleTasks(): Task[] {
       horizon: "tactical",
       plannedStartDate: dateOffset(2),
       dueDate: dateOffset(7),
+      dailyPlanDate: null,
+      dailyPlanHour: null,
       actualStartedAt: null,
       progressPercent: 20,
       executionNote: "Зібрано ціни на основні деталі.",
@@ -136,6 +142,8 @@ function toTask(value: unknown): Task | null {
     !isTaskHorizon(task.horizon) ||
     (typeof task.plannedStartDate !== "string" && task.plannedStartDate !== null && task.plannedStartDate !== undefined) ||
     (typeof task.dueDate !== "string" && task.dueDate !== null) ||
+    (typeof task.dailyPlanDate !== "string" && task.dailyPlanDate !== null && task.dailyPlanDate !== undefined) ||
+    (typeof task.dailyPlanHour !== "number" && task.dailyPlanHour !== null && task.dailyPlanHour !== undefined) ||
     (typeof task.actualStartedAt !== "string" && task.actualStartedAt !== null && task.actualStartedAt !== undefined) ||
     typeof task.status !== "string" ||
     !isTaskStatus(task.status) ||
@@ -164,6 +172,8 @@ function toTask(value: unknown): Task | null {
     horizon: task.horizon,
     plannedStartDate: typeof task.plannedStartDate === "string" ? task.plannedStartDate : null,
     dueDate: task.dueDate,
+    dailyPlanDate: typeof task.dailyPlanDate === "string" ? task.dailyPlanDate : null,
+    dailyPlanHour: typeof task.dailyPlanHour === "number" && task.dailyPlanHour >= 8 && task.dailyPlanHour <= 20 ? task.dailyPlanHour : null,
     actualStartedAt: typeof task.actualStartedAt === "string" ? task.actualStartedAt : null,
     progressPercent: typeof task.progressPercent === "number" && task.progressPercent >= 0 && task.progressPercent <= 100 ? task.progressPercent : task.status === "completed" ? 100 : 0,
     executionNote: typeof task.executionNote === "string" ? task.executionNote : null,

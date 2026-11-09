@@ -25,6 +25,8 @@ export type Task = Readonly<{
   horizon: TaskHorizon;
   plannedStartDate: string | null;
   dueDate: string | null;
+  dailyPlanDate: string | null;
+  dailyPlanHour: number | null;
   actualStartedAt: string | null;
   progressPercent: number;
   executionNote: string | null;

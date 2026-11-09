@@ -15,6 +15,8 @@ type TaskRow = {
   horizon: Task["horizon"];
   planned_start_date?: string | null;
   due_date: string | null;
+  daily_plan_date?: string | null;
+  daily_plan_hour?: number | null;
   actual_started_at?: string | null;
   progress_percent?: number | null;
   execution_note?: string | null;
@@ -95,6 +97,8 @@ function mapTask(row: TaskRow): Task {
     horizon: row.horizon,
     plannedStartDate: row.planned_start_date ?? null,
     dueDate: row.due_date,
+    dailyPlanDate: row.daily_plan_date ?? null,
+    dailyPlanHour: typeof row.daily_plan_hour === "number" && row.daily_plan_hour >= 8 && row.daily_plan_hour <= 20 ? row.daily_plan_hour : null,
     actualStartedAt: row.actual_started_at ?? null,
     progressPercent: typeof row.progress_percent === "number" && row.progress_percent >= 0 && row.progress_percent <= 100 ? row.progress_percent : row.status === "completed" ? 100 : 0,
     executionNote: row.execution_note ?? null,
@@ -119,7 +123,7 @@ function mapTask(row: TaskRow): Task {
   };
 }
 
-const taskFieldsWithoutAssignee = "id, title, goal, area, horizon, planned_start_date, due_date, actual_started_at, progress_percent, execution_note, execution_updated_at, status, postponed_until, created_by, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, project_id, families(name), task_workspaces(name), task_projects(name), task_participants(member_user_id, member_name)";
+const taskFieldsWithoutAssignee = "id, title, goal, area, horizon, planned_start_date, due_date, daily_plan_date, daily_plan_hour, actual_started_at, progress_percent, execution_note, execution_updated_at, status, postponed_until, created_by, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, project_id, families(name), task_workspaces(name), task_projects(name), task_participants(member_user_id, member_name)";
 const taskFields = taskFieldsWithoutAssignee.replace("created_by, created_by_name", "created_by, created_by_name, assignee_user_id, assignee_name");
 const legacyTaskFields = "id, title, goal, area, horizon, due_date, status, postponed_until, created_by, created_by_name, created_at, completed_by, completed_at, rejected_by, rejected_at, family_id, workspace_id, families(name), task_workspaces(name), task_participants(member_user_id, member_name)";
 
@@ -183,6 +187,17 @@ export async function getGanttSetupError(): Promise<string | null> {
     .limit(1);
 
   return error ? "Виконайте файл supabase/task-gantt.sql у SQL Editor." : null;
+}
+
+export async function getDailyPlanSetupError(): Promise<string | null> {
+  await getTaskUserContext();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tasks")
+    .select("daily_plan_date, daily_plan_hour")
+    .limit(1);
+
+  return error ? "Щоб планувати задачі за годинами у вкладці «Сьогодні», виконайте файл supabase/task-daily-plan.sql у SQL Editor." : null;
 }
 
 export async function getTaskExecutionSetupError(): Promise<string | null> {
