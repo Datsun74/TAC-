@@ -8,6 +8,7 @@ import { readLocalTestTasks, writeLocalTestTasks } from "@/lib/local-test-tasks"
 import { createClient } from "@/lib/supabase/client";
 import { taskAreaLabels, taskHorizonLabels } from "@/lib/task-options";
 import type { Task } from "@/types/task";
+import { TaskStickyNotes } from "@/components/task-sticky-notes";
 
 type TaskDailyPlanBoardProps = Readonly<{
   tasks: readonly Task[];
@@ -48,11 +49,12 @@ function planErrorMessage() {
   return "Не вдалося оновити денний план. Перевірте, чи виконано файл supabase/task-daily-plan.sql у Supabase SQL Editor.";
 }
 
-function CompactTaskCard({ task, today, tomorrow, testMode, onClear, onComplete, draggable, onDragEnd, onDragStart }: Readonly<{
+function CompactTaskCard({ task, today, tomorrow, testMode, onStart, onClear, onComplete, draggable, onDragEnd, onDragStart }: Readonly<{
   task: Task;
   today: string;
   tomorrow: string;
   testMode: boolean;
+  onStart?: () => void;
   onClear?: () => void;
   onComplete?: () => void;
   draggable?: boolean;
@@ -70,7 +72,8 @@ function CompactTaskCard({ task, today, tomorrow, testMode, onClear, onComplete,
         <p className="mt-1 truncate text-[10px] leading-4 text-stone-500" title={peopleForTask(task)}>{task.projectName ? `Проєкт · ${task.projectName}` : `${taskAreaLabels[task.area]} · ${taskHorizonLabels[task.horizon]}`}</p>
         {task.dailyPlanDate ? <p className="text-[10px] leading-4 text-stone-500">{planLabel(task, today, tomorrow)}</p> : null}
       </div>
-      {onClear || onComplete ? <div className="mt-2 flex flex-wrap gap-1">
+      {onStart || onClear || onComplete ? <div className="mt-2 flex flex-wrap gap-1">
+        {onStart ? <button className="rounded-md bg-sky-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-sky-800" onClick={onStart} type="button">Взяти у процес</button> : null}
         {onComplete ? <button className="rounded-md bg-emerald-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-emerald-800" onClick={onComplete} type="button">✓ Виконано</button> : null}
         {onClear ? <button className="rounded-md border border-stone-300 px-2 py-1 text-[10px] font-semibold text-stone-700 hover:bg-stone-50" onClick={onClear} type="button">Зняти</button> : null}
       </div> : null}
@@ -96,6 +99,9 @@ export function TaskDailyPlanBoard({ tasks, memberName, testMode }: TaskDailyPla
   const todayCompletedTasks = useMemo(() => items
     .filter((task) => task.status === "completed" && task.dailyPlanDate === today && task.dailyPlanHour !== null)
     .sort((left, right) => (left.dailyPlanHour ?? 99) - (right.dailyPlanHour ?? 99) || left.title.localeCompare(right.title, "uk")), [items, today]);
+  const plannedStartTasks = useMemo(() => items
+    .filter((task) => (task.status === "active" || task.status === "in_work") && task.plannedStartDate !== null && task.plannedStartDate <= today)
+    .sort((left, right) => (left.plannedStartDate ?? "9999-12-31").localeCompare(right.plannedStartDate ?? "9999-12-31") || left.title.localeCompare(right.title, "uk")), [items, today]);
 
   function startDragging(event: DragEvent<HTMLElement>, task: Task) {
     if (task.status !== "in_progress") return;
@@ -149,6 +155,37 @@ export function TaskDailyPlanBoard({ tasks, memberName, testMode }: TaskDailyPla
     const previousItems = items;
     const nextItems = items.map((item) => item.id === taskId ? { ...item, dailyPlanDate: planDate, dailyPlanHour: planHour } : item);
     await saveItems(previousItems, nextItems, taskId, { daily_plan_date: planDate, daily_plan_hour: planHour });
+  }
+
+  async function startPlannedTask(taskId: string) {
+    const task = items.find((item) => item.id === taskId);
+    if (!task || (task.status !== "active" && task.status !== "in_work")) return;
+    const changedAt = new Date().toISOString();
+    const startedTask: Task = {
+      ...task,
+      status: "in_progress",
+      dailyPlanDate: null,
+      dailyPlanHour: null,
+      postponedUntil: null,
+      completedBy: null,
+      completedAt: null,
+      rejectedBy: null,
+      rejectedAt: null,
+      actualStartedAt: task.actualStartedAt ?? changedAt,
+    };
+    const previousItems = items;
+    const nextItems = items.map((item) => item.id === taskId ? startedTask : item);
+    await saveItems(previousItems, nextItems, taskId, {
+      status: "in_progress",
+      postponed_until: null,
+      completed_by: null,
+      completed_at: null,
+      rejected_by: null,
+      rejected_at: null,
+      actual_started_at: startedTask.actualStartedAt,
+      daily_plan_date: null,
+      daily_plan_hour: null,
+    }, { previousStatus: task.status, nextStatus: "in_progress" });
   }
 
   async function clearPlan(taskId: string) {
@@ -237,12 +274,14 @@ export function TaskDailyPlanBoard({ tasks, memberName, testMode }: TaskDailyPla
   }
 
   return (
-    <>
-      <section className="mt-8 rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
+    <div className="mt-8 xl:grid xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start xl:gap-4">
+      <div className="min-w-0">
+      <section className="rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
         <p className="text-sm font-semibold text-stone-950">Денний план не змінює Канбан</p>
         <p className="mt-1 text-xs leading-5 text-stone-600">Спершу переведіть задачу в загальний стан «У процесі». Потім перетягніть її в годину «Сьогодні» або «Завтра». Задача лишиться у Канбані й на Ганті, а виконання змінить її основний стан для всієї системи.</p>
       </section>
       {error ? <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm leading-6 text-red-800" role="alert">{error}</p> : null}
+      {plannedStartTasks.length > 0 ? <section className="mt-4 rounded-2xl border border-violet-200 bg-violet-50/70 p-3" aria-label="Задачі, для яких настав плановий старт"><div className="flex flex-wrap items-baseline justify-between gap-2"><div><h2 className="text-sm font-bold text-stone-950">Настав плановий старт</h2><p className="mt-1 text-xs leading-5 text-stone-600">Ці задачі вже мають початися за планом. Натисніть «Взяти у процес», після чого вони з’являться у першій колонці.</p></div><span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-stone-700">{plannedStartTasks.length}</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{plannedStartTasks.map((task) => <CompactTaskCard key={task.id} onStart={() => void startPlannedTask(task.id)} task={task} testMode={testMode} today={today} tomorrow={tomorrow} />)}</div></section> : null}
 
       <div className="mt-6 grid gap-3 lg:hidden">
         <section className="rounded-2xl border border-sky-200 bg-sky-50/60 p-3">
@@ -283,6 +322,8 @@ export function TaskDailyPlanBoard({ tasks, memberName, testMode }: TaskDailyPla
           {hours.map((hour, index) => renderSlot(today, hour, "completed", index + 2))}
         </div>
       </section>
-    </>
+      </div>
+      <div className="mt-4 xl:mt-0"><TaskStickyNotes /></div>
+    </div>
   );
 }

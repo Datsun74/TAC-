@@ -10,7 +10,7 @@ export default async function TasksTodayPage() {
   const member = await getTaskUserContext();
   const [result, dailyPlanSetupError] = testMode
     ? [null, null]
-    : await Promise.all([getTasks(["in_progress", "completed"]), getDailyPlanSetupError()]);
+    : await Promise.all([getTasks(["active", "in_work", "in_progress", "completed"]), getDailyPlanSetupError()]);
 
   return (
     <section className="w-full py-10 sm:py-14 lg:py-16">
