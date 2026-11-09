@@ -116,6 +116,68 @@ function ProposalMeta({ author, updatedAt }: Readonly<{ author: string | null; u
   return <p className="mt-1 text-xs leading-5 text-stone-500">Останню пропозицію оновив(ла) {author ?? "учасник"}{date ? ` · ${date}` : ""}.</p>;
 }
 
+function MetricLine({ metricName, metricTarget }: Readonly<{ metricName: string; metricTarget: string }>) {
+  if (!metricName && !metricTarget) return <p className="mt-2 text-xs text-stone-500">Метрику ще не визначено</p>;
+  return <p className="mt-2 text-xs leading-5 text-stone-600"><span className="font-semibold text-stone-700">{metricName || "Метрика"}</span>{metricTarget ? `: ${metricTarget}` : ""}</p>;
+}
+
+function HoshinRelationshipMap({ nodes, plan, task }: Readonly<{
+  nodes: readonly TaskHoshinNode[];
+  plan: TaskHoshinPlan | undefined;
+  task: Task;
+}>) {
+  const divisions = nodes.filter((node) => node.level === "division");
+  const departmentsFor = (divisionId: string) => nodes.filter((node) => node.level === "department" && node.parentId === divisionId);
+  const centralOwner = plan?.ownerName || task.createdByName;
+
+  return (
+    <section className="rounded-3xl border border-violet-200 bg-violet-50/50 p-4 shadow-sm sm:p-5" aria-labelledby="hoshin-map-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-bold tracking-[0.14em] text-violet-800 uppercase">Візуальна карта</p>
+          <h2 className="mt-1 text-xl font-bold text-stone-950" id="hoshin-map-title">Взаємозв’язок цілі та відповідальних</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-stone-600">Лінії показують, який підрозділ та відділ працює на центральну стратегічну ціль. Натисніть на блок, щоб перейти до його редагування.</p>
+        </div>
+        <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-bold text-violet-900">{divisions.length} підрозділів</span>
+      </div>
+
+      <div className="mt-5">
+        <div className="mx-auto max-w-xl rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-center shadow-sm">
+          <p className="text-[11px] font-bold tracking-[0.14em] text-amber-800 uppercase">Центральна ціль</p>
+          <a className="mt-1 block font-bold text-stone-950 hover:text-amber-900 hover:underline" href={`#hoshin-central-${task.id}`}>{task.title}</a>
+          <p className="mt-1 text-xs text-stone-600">Власник: {centralOwner || "не визначено"}</p>
+          <MetricLine metricName={plan?.metricName ?? ""} metricTarget={plan?.metricTarget ?? ""} />
+        </div>
+        <div aria-hidden="true" className="mx-auto h-6 w-px bg-violet-300" />
+
+        {divisions.length === 0 ? <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-violet-300 bg-white/80 px-4 py-5 text-center text-sm leading-6 text-stone-600">Додайте перший підрозділ нижче — він з’явиться на цій карті та буде пов’язаний із центральною ціллю.</div> : <><div aria-hidden="true" className="relative hidden h-5 md:block"><span className="absolute top-0 right-[12%] left-[12%] h-px bg-violet-300" /></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {divisions.map((division) => {
+            const departments = departmentsFor(division.id);
+            return <article className="relative rounded-2xl border border-sky-200 bg-white p-3 shadow-sm" key={division.id}>
+              <div aria-hidden="true" className="absolute -top-4 left-1/2 h-4 w-px -translate-x-1/2 bg-violet-300 md:hidden" />
+              <div aria-hidden="true" className="absolute -top-5 left-1/2 hidden h-5 w-px -translate-x-1/2 bg-violet-300 md:block" />
+              <p className="text-[11px] font-bold tracking-[0.12em] text-sky-800 uppercase">Підрозділ</p>
+              <a className="mt-1 block font-bold text-stone-950 hover:text-sky-800 hover:underline" href={`#hoshin-node-${division.id}`}>{division.title}</a>
+              <p className="mt-1 text-xs text-stone-600">Власник: {division.ownerName || "не визначено"}</p>
+              <MetricLine metricName={division.metricName} metricTarget={division.metricTarget} />
+              <div className="mt-3 border-t border-sky-100 pt-3">
+                <p className="text-[11px] font-bold tracking-[0.12em] text-stone-500 uppercase">Відділи · {departments.length}</p>
+                {departments.length === 0 ? <p className="mt-2 text-xs text-stone-500">Поки не додано.</p> : <div className="mt-2 space-y-2">
+                  {departments.map((department) => <a className="block rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm transition hover:border-violet-300 hover:bg-violet-50" href={`#hoshin-node-${department.id}`} key={department.id}>
+                    <span className="font-semibold text-stone-900">{department.title}</span>
+                    <span className="mt-1 block text-xs text-stone-600">{department.ownerName ? `Відповідальний: ${department.ownerName}` : "Відповідального ще не вказано"}</span>
+                    {(department.metricName || department.metricTarget) ? <span className="mt-1 block text-xs text-stone-600">{department.metricName || "Метрика"}{department.metricTarget ? `: ${department.metricTarget}` : ""}</span> : null}
+                  </a>)}
+                </div>}
+              </div>
+            </article>;
+          })}
+        </div></>}
+      </div>
+    </section>
+  );
+}
+
 function HoshinFields({ values, onChange, disabled }: Readonly<{
   values: HoshinValues;
   onChange: (field: keyof HoshinValues, value: string) => void;
@@ -199,7 +261,7 @@ function CentralPlanEditor({ currentUserName, disabled, onSaved, plan, task }: R
   }
 
   return (
-    <form className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 sm:p-5" onSubmit={(event) => void save(event)}>
+    <form className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 sm:p-5" id={`hoshin-central-${task.id}`} onSubmit={(event) => void save(event)}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold tracking-[0.14em] text-amber-800 uppercase">F3 · Центральна стратегічна ціль</p>
@@ -281,7 +343,7 @@ function NodeEditor({ currentUserName, disabled, node, onDeleted, onSaved }: Rea
 
   const levelLabel = node.level === "division" ? "F3 · Підрозділ" : "F3 · Відділ";
   return (
-    <form className={`rounded-2xl border p-4 ${node.level === "division" ? "border-sky-200 bg-sky-50/60" : "border-stone-200 bg-white"}`} onSubmit={(event) => void save(event)}>
+    <form className={`rounded-2xl border p-4 ${node.level === "division" ? "border-sky-200 bg-sky-50/60" : "border-stone-200 bg-white"}`} id={`hoshin-node-${node.id}`} onSubmit={(event) => void save(event)}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <label className="min-w-0 flex-1">
           <span className="text-xs font-bold tracking-[0.14em] text-sky-800 uppercase">{levelLabel}</span>
@@ -431,6 +493,7 @@ export function TaskHoshinKanri({ currentUserName, initialNodes, initialPlans, s
       </section>
 
       {selectedTask ? <>
+        <HoshinRelationshipMap nodes={selectedNodes} plan={selectedPlan} task={selectedTask} />
         <CentralPlanEditor currentUserName={currentUserName} disabled={disabled} key={selectedTask.id} onSaved={replacePlan} plan={selectedPlan} task={selectedTask} />
         <section className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[0.14em] text-stone-500 uppercase">Каскад цілі</p><h2 className="mt-1 text-xl font-bold text-stone-950">Підрозділи й відділи</h2><p className="mt-1 text-sm leading-6 text-stone-600">Кожний рівень отримує дію, метрику та відповідь виконавця. Це допомагає погодити план до початку виконання.</p></div><span className="rounded-full bg-stone-100 px-3 py-1.5 text-sm font-bold text-stone-700">{divisions.length} підрозд.</span></div>
