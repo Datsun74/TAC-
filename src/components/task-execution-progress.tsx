@@ -8,6 +8,7 @@ import { formatTaskDate } from "@/lib/task-options";
 import type { Task } from "@/types/task";
 
 type TaskExecutionProgressProps = Readonly<{
+  embedded?: boolean;
   setupError: string | null;
   task: Pick<Task, "id" | "status" | "progressPercent" | "executionNote" | "executionUpdatedAt" | "plannedStartDate" | "dueDate">;
 }>;
@@ -16,8 +17,9 @@ function formatUpdatedAt(value: string) {
   return new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(value));
 }
 
-export function TaskExecutionProgress({ setupError, task }: TaskExecutionProgressProps) {
+export function TaskExecutionProgress({ embedded = false, setupError, task }: TaskExecutionProgressProps) {
   const router = useRouter();
+  const Heading = embedded ? "h4" : "h2";
   const completed = task.status === "completed";
   const initialProgress = completed ? 100 : task.progressPercent;
   const [isOpen, setIsOpen] = useState(false);
@@ -82,9 +84,9 @@ export function TaskExecutionProgress({ setupError, task }: TaskExecutionProgres
   const displayedProgress = completed ? 100 : task.progressPercent;
   const noteLabel = completed ? "Результат виконання" : "Поточний етап / що вже зроблено";
 
-  return <section className="mt-7 border-t border-stone-100 pt-5" aria-labelledby="task-execution-heading">
+  return <section className={embedded ? "mt-5" : "mt-7 border-t border-stone-100 pt-5"} aria-labelledby="task-execution-heading">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="text-base font-semibold text-stone-950" id="task-execution-heading">Виконання та строки</h2><p className="mt-1 text-sm text-stone-600">Зафіксуйте прогрес, поточний етап і за потреби перенесіть план.</p></div>
+      <div><Heading className="text-base font-semibold text-stone-950" id="task-execution-heading">Виконання та строки</Heading><p className="mt-1 text-sm text-stone-600">Зафіксуйте прогрес, поточний етап і за потреби перенесіть план.</p></div>
       {!isOpen ? <button className="inline-flex min-h-10 items-center justify-center rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50" onClick={() => setIsOpen(true)} type="button">Оновити / перенести</button> : null}
     </div>
 

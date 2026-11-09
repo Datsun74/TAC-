@@ -81,28 +81,42 @@ export default async function TaskDetailPage(props: PageProps<"/tasks/[taskId]">
           {task.projectName ? <div><dt className="text-stone-500">Постійний простір</dt><dd className="mt-1 font-semibold text-stone-800">{task.scopeName}</dd></div> : null}
           <div className="sm:col-span-2"><dt className="text-stone-500">Учасники</dt><dd className="mt-1 font-semibold text-stone-800">{[task.createdByName, ...task.participants.map((participant) => participant.name)].join(", ")}</dd></div>
         </dl>
-        <TaskExecutionProgress setupError={executionSetupError} task={task} />
-        <section className="mt-7 border-t border-stone-100 pt-5" aria-labelledby="task-activity-heading">
-          <h2 className="text-base font-semibold text-stone-950" id="task-activity-heading">Історія задачі</h2>
-          <ol className="mt-3 space-y-3">
-            {activity.map((entry) => <li className="flex gap-3 text-sm leading-5" key={`${entry.label}-${entry.date}`}><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-700" /><div><p className="font-semibold text-stone-800">{entry.label}</p><p className="text-stone-600">{entry.text}</p><time className="text-xs text-stone-500" dateTime={entry.date}>{formatTaskTimestamp(entry.date)}</time></div></li>)}
-            {task.status === "postponed" && task.postponedUntil ? <li className="flex gap-3 text-sm leading-5"><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-400" /><div><p className="font-semibold text-stone-800">Відкладено</p><p className="text-stone-600">Задача відкладена до {formatTaskDate(task.postponedUntil)}.</p></div></li> : null}
-          </ol>
-          {result.activityError ? <p className="mt-4 rounded-xl bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">{result.activityError}</p> : null}
-        </section>
         <TaskAssigneeEditor availableMembers={taskSpace?.members ?? []} initialParticipants={task.participants} setupError={assigneeSetupError} task={task} />
         <TaskParticipantsEditor assigneeId={task.assigneeId} availableMembers={taskSpace?.members ?? []} createdById={task.createdById} createdByName={task.createdByName} initialParticipants={task.participants} setupError={formContext.error} taskId={task.id} />
         <TaskDetailStatus actualStartedAt={task.actualStartedAt} memberName={member.displayName} postponedUntil={task.postponedUntil} status={task.status} taskId={task.id} />
       </div>
 
-      <TaskChecklist
-        currentUserId={member.userId}
-        currentUserName={member.displayName}
-        initialItems={result.checklistItems}
-        setupError={result.checklistError}
-        taskId={task.id}
-      />
-      <TaskComments currentUserName={member.displayName} initialComments={result.comments} setupError={result.commentsError} taskId={task.id} />
+      <section className="mt-8 max-w-3xl rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8" aria-labelledby="task-work-heading">
+        <p className="text-sm font-semibold tracking-[0.16em] text-amber-800 uppercase">План дій</p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-stone-950" id="task-work-heading">Виконання задачі та спільна робота</h2>
+        <p className="mt-2 text-sm leading-6 text-stone-600">Для простої задачі залишайте оновлення нижче. Для складної — додайте кроки; у всіх записах автоматично фіксуються автор, дата та час.</p>
+
+        <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 sm:p-5" aria-labelledby="task-progress-work-heading">
+          <p className="text-sm font-semibold tracking-[0.16em] text-amber-800 uppercase">1. Хід виконання</p>
+          <h3 className="mt-2 text-lg font-semibold text-stone-950" id="task-progress-work-heading">{task.title}</h3>
+          <p className="mt-1 text-sm leading-6 text-stone-600">Ведіть короткі оновлення, домовленості та результат, навіть коли підзадачі не потрібні.</p>
+          <TaskExecutionProgress embedded setupError={executionSetupError} task={task} />
+          <TaskComments embedded currentUserName={member.displayName} initialComments={result.comments} setupError={result.commentsError} taskId={task.id} />
+          <section className="mt-5 border-t border-stone-200 pt-5" aria-labelledby="task-activity-heading">
+            <h4 className="text-base font-semibold text-stone-950" id="task-activity-heading">Стрічка змін стану</h4>
+            <p className="mt-1 text-sm leading-6 text-stone-600">Зміна стану задачі фіксується автоматично.</p>
+            <ol className="mt-3 space-y-3">
+              {activity.map((entry) => <li className="flex gap-3 text-sm leading-5" key={`${entry.label}-${entry.date}`}><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-700" /><div><p className="font-semibold text-stone-800">{entry.label}</p><p className="text-stone-600">{entry.text}</p><time className="text-xs text-stone-500" dateTime={entry.date}>{formatTaskTimestamp(entry.date)}</time></div></li>)}
+              {task.status === "postponed" && task.postponedUntil ? <li className="flex gap-3 text-sm leading-5"><span className="mt-1.5 size-2 shrink-0 rounded-full bg-amber-400" /><div><p className="font-semibold text-stone-800">Відкладено</p><p className="text-stone-600">Задача відкладена до {formatTaskDate(task.postponedUntil)}.</p></div></li> : null}
+            </ol>
+            {result.activityError ? <p className="mt-4 rounded-xl bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">{result.activityError}</p> : null}
+          </section>
+        </section>
+
+        <TaskChecklist
+          currentUserId={member.userId}
+          currentUserName={member.displayName}
+          embedded
+          initialItems={result.checklistItems}
+          setupError={result.checklistError}
+          taskId={task.id}
+        />
+      </section>
       {result.error ? <p className="mt-6 max-w-3xl rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900" role="status">{result.error}</p> : null}
       {task.scopeKind === "family" && member.family ? (
         <TaskAttachments attachments={result.attachments} currentMember={{ id: member.userId, name: member.displayName }} familyId={member.family.familyId} taskId={task.id} testMode={false} />

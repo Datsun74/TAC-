@@ -9,10 +9,15 @@ import type { TaskChecklistItem } from "@/types/task";
 type TaskChecklistProps = Readonly<{
   currentUserId: string;
   currentUserName: string;
+  embedded?: boolean;
   initialItems: readonly TaskChecklistItem[];
   setupError: string | null;
   taskId: string;
 }>;
+
+function formatChecklistTime(value: string) {
+  return new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(value));
+}
 
 function mapChecklistItem(item: {
   id: string;
@@ -34,8 +39,9 @@ function mapChecklistItem(item: {
   };
 }
 
-export function TaskChecklist({ currentUserId, currentUserName, initialItems, setupError, taskId }: TaskChecklistProps) {
+export function TaskChecklist({ currentUserId, currentUserName, embedded = false, initialItems, setupError, taskId }: TaskChecklistProps) {
   const router = useRouter();
+  const Heading = embedded ? "h3" : "h2";
   const [items, setItems] = useState<readonly TaskChecklistItem[]>(initialItems);
   const [newItemTitle, setNewItemTitle] = useState("");
   const [error, setError] = useState("");
@@ -122,12 +128,12 @@ export function TaskChecklist({ currentUserId, currentUserName, initialItems, se
   }
 
   return (
-    <section className="mt-8 max-w-3xl rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8" aria-labelledby="task-checklist-heading">
+    <section className={embedded ? "mt-5 rounded-2xl border border-stone-200 bg-stone-50/60 p-4 sm:p-5" : "mt-8 max-w-3xl rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8"} aria-labelledby="task-checklist-heading">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold tracking-[0.16em] text-amber-800 uppercase">План дій</p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-stone-950" id="task-checklist-heading">Кроки задачі</h2>
-          <p className="mt-1 text-sm text-stone-600">{items.length === 0 ? "Розбийте велику справу на прості кроки." : "Виконано " + completedCount + " з " + items.length + " кроків."}</p>
+          <p className="text-sm font-semibold tracking-[0.16em] text-amber-800 uppercase">{embedded ? "2. Підзадачі" : "План дій"}</p>
+          <Heading className="mt-2 text-xl font-semibold tracking-tight text-stone-950" id="task-checklist-heading">{embedded ? "Кроки / підзадачі" : "Кроки задачі"}</Heading>
+          <p className="mt-1 text-sm text-stone-600">{items.length === 0 ? "За потреби розбийте велику справу на прості кроки." : "Виконано " + completedCount + " з " + items.length + " кроків."}</p>
         </div>
         {items.length > 0 ? <span className="rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-950">{progress}%</span> : null}
       </div>
@@ -155,7 +161,7 @@ export function TaskChecklist({ currentUserId, currentUserName, initialItems, se
               />
               <div className="min-w-0">
                 <p className={"text-sm leading-6 " + (item.isCompleted ? "text-stone-400 line-through" : "font-medium text-stone-800")}>{item.title}</p>
-                {item.isCompleted && item.completedByName ? <p className="mt-1 text-xs text-stone-500">Виконав(ла): {item.completedByName}</p> : null}
+                {item.isCompleted && item.completedByName ? <p className="mt-1 text-xs text-stone-500">Виконав(ла): {item.completedByName}{item.completedAt ? ` · ${formatChecklistTime(item.completedAt)}` : ""}</p> : null}
               </div>
             </li>
           ))}
